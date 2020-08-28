@@ -24,7 +24,10 @@
     [(? symbol? x)
      (match-define `(,v ,pprime) (hash-ref env x (raise `(no var ,x found in env ,env))))
      (list v pprime cont)]
-    
+    ; when we encounter an application, we prep the operand to be evaluated,
+    ; and add an `ar` continuation so we can call the operand after it is evaluated.
+    ; The `ar` continuation is for the context E[([] e)], as in, we are evaluating
+    ; the hole (the operand) and then will do something else afterwards.
     [`(,e0 ,e1)
      (list e0 env `(ar ,e1 ,env ,cont))]
     [`(λ ,(? symbol? x) ,e)
@@ -33,8 +36,14 @@
        ; we need to check for this state (lambda with mt cont) after calling step
        ; to see that we are at the end.
        ['mt (list exp env cont)]
+       ; We get here when we evaluate (e0 e1) and e0 is an abstraction.
+       ; the next state is that we must evaluate the operand with its env,
+       ; and afterwards we will use the `fn` continuation frame.
        [`(ar ,e ,pprime ,k)
         (list e pprime `(fn ,exp ,pprime ,k))]
+       ; Here we have finished evaluating the operand and the operator,
+       ; and we now finally evaluate the body of the abstraction,
+       ; now that we have the value to place into x.
        [`(fn (λ ,x ,e) ,pprime ,k)
         (list e (hash-set pprime x (list exp env)) k)]
        [else (raise `(WAT! ,exp ,env ,cont))])]
@@ -54,8 +63,8 @@
     (if (is-fixed next-st) next-st (go next-st)))
   (go (inj-cek e)))
 
-; lazy davis shortcut
-(define (e exp) (evaluate exp))
+; lazy davis shortcut for REPL
+(define e evaluate)
 
 ; (evaluate '((λ n (λ s (λ z (s ((n s) z))))) (λ s (λ z z))))
 ; => '((λ s (λ z (s ((n s) z)))) #hash((n . ((λ s (λ z z)) #hash()))) mt)
