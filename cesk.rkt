@@ -36,5 +36,6 @@
       [else #f]))
   (define (go st)
     (define next-st (apply step-cesk st))
+    (println `(next-state: ,next-st))
     (if (is-fixed next-st) next-st (go next-st)))
   (go (inj-cesk e)))

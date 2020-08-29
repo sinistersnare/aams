@@ -66,6 +66,7 @@
       [else #f]))
   (define (go st)
     (define next-st (apply cek-step st))
+    (println `(next-state: ,next-st))
     (if (is-fixed next-st) next-st (go next-st)))
   (go (inj-cek e)))
 
