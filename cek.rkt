@@ -1,9 +1,17 @@
 #lang racket
 
+; A CEK machine implementing the λ-calculus.
+; CEK = Control, Environment, Kontinuation (spelled with K because Control took C from us).
+; Abstract Machines are a way to implement interpreters in a formalized way.
+; The Control tells us what we are currently evaluating.
+; The Environment is the bound variables in the current context
+; The Kontinuation tells us what to do after evaluating the Control.
+; There are simpler machines than this one, but this is the simplest that we will implement here.
+
 ; A state consists of
 ;     x ∈ Varx  -- The set of identifiers
-;     v ∈ Val ::= (λx.e)
-;     e ∈ Exp ::=  x | (e e) | (λx.e)
+;     v ∈ Val ::= (λ x e)
+;     e ∈ Exp ::=  x | (e e) | (λ x e)
 ;     ρ ∈ Env = Var → (Val x Env)
 ;     κ ∈ Kont ::= mt | ar(e,ρ,κ) | fn(v,ρ,κ)
 ;     ς ∈ Σ = Exp x Env x Kont
@@ -22,7 +30,7 @@
   (match exp
     ; if the control string is simply a symbol, then we check it in the hash, and return that.
     [(? symbol? x)
-     (match-define `(,v ,pprime) (hash-ref env x (raise `(no var ,x found in env ,env))))
+     (match-define `(,v ,pprime) (hash-ref env x (lambda () (raise `(no var ,x found in env ,env)))))
      (list v pprime cont)]
     ; when we encounter an application, we prep the operand to be evaluated,
     ; and add an `ar` continuation so we can call the operand after it is evaluated.
@@ -49,13 +57,11 @@
        [else (raise `(WAT! ,exp ,env ,cont))])]
     [else (raise `(BAD-SYNTAX! ,exp ,env ,cont))]))
 
-; do a single step from an initial state with e.
-(define (s e) (apply cek-step (inj-cek e)))
-
 ; evaluates e from an initial state until it reaches a fixed-point: <v, p, mt>.
 (define (evaluate e)
   (define (is-fixed st)
     (match st
+      ; if the control is an abstraction and the kont is mt, then we are at a fixed point.
       [`((λ ,x ,e) ,env mt) #t]
       [else #f]))
   (define (go st)
@@ -63,18 +69,12 @@
     (if (is-fixed next-st) next-st (go next-st)))
   (go (inj-cek e)))
 
-; lazy davis shortcut for REPL
+;;; lazy davis shortcuts for REPL ;;;
+; do a single step from an initial state with e.
+(define (s e) (apply cek-step (inj-cek e)))
 (define e evaluate)
 
 ; (evaluate '((λ n (λ s (λ z (s ((n s) z))))) (λ s (λ z z))))
 ; => '((λ s (λ z (s ((n s) z)))) #hash((n . ((λ s (λ z z)) #hash()))) mt)
 ; So n is still here at the end, but its in the env. Is this the correct output of this machine?
 ; I think so!
-
-
-
-
-
-
-
-
