@@ -1,6 +1,10 @@
 #lang racket
 
 ; just gonna use this as a template for all the machines.
+; TODO: make this some sort of interface. Does racket have interfaces? What would be idiomatic?
+;       Would probably make State an interface itself, or some object that can be
+;       different to each machine. And then destructure it in the match,
+;       instead of having different args for each step function.
 
 ; create an initial state around a closed expression
 (define (inj-cesk e) '())
