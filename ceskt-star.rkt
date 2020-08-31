@@ -4,6 +4,8 @@
 (define (inj-ceskt* e)
   ; I made timestamp start at 1 because 0 is used by the mt continuation.
   ; TODO: Am I wrong to do this? Is this bad?
+  ; im not worried about it not working, but t0 is defined in the paper as 0.
+  ; so maybe im just missing something in regards to how alloc is impld.
   (list e (hash) (hash 0 'mt) 0 1))
 
 ; move the machine 1 step from a given state.
