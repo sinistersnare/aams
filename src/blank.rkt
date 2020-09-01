@@ -7,9 +7,9 @@
 ;       instead of having different args for each step function.
 
 ; create an initial state around a closed expression
-(define (inj-cesk e) '())
+(define (inj-TYPE e) '())
 ; move the machine 1 step from a given state.
-(define (step-cesk exp env store cont) '())
+(define (step-TYPE exp env store cont) '())
 ; evaluate from an initial state
 (define (evaluate e)
   (define (is-fixed st)
@@ -19,7 +19,7 @@
       [`((λ ,x ,e) ,env ,store mt) #t]
       [else #f]))
   (define (go st)
-    (define next-st (apply step-cesk st))
+    (define next-st (apply step-TYPE st))
     (println `(next-state: ,next-st))
     (if (is-fixed next-st) next-st (go next-st)))
-  (go (inj-cesk e)))
+  (go (inj-TYPE e)))
