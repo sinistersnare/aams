@@ -3,25 +3,28 @@
 (require (only-in racket/random random-ref))
 (require (only-in racket/hash hash-union))
 
-; An aCESKt* with no timestamp, so its monotonic.
-; A 0CFA.
-; so i guess its just a aCESK* machine. but its too late to change the file name now!
+; An aCESKt* machine! The tick function is `identity` so this is a 0CFA?
 
 ; make a state of the machine.
-(define (make-state expr env env-store k-store cont-addr)
-  (list expr env env-store k-store cont-addr))
+(define (make-state expr env env-store k-store cont-addr timestamp)
+  (list expr env env-store k-store cont-addr timestamp))
 
 ; create an initial state around a closed expression
 (define (inj-aceskt* e)
   ; expr , env , env-store , k-store , k
   ; where the stores are Addr -> P(ValueType). 
-  (make-state e (hash) (hash) (hash 0 (set 'mt)) 0))
+  (make-state e (hash) (hash) (hash 0 (set 'mt)) 0 1))
 
 ; move the machine 1 step from a given state.
 ; takes a single state, returns a list of states that can be reached.
 (define (step-aceskt* state)
+  ; right now, tick is just defined as the identity function
+  ; but it needs a continuation argument, and it needs to be not the identity function
+  ; what will it be?
+  ; HELP: above.
+  (define (tick t) t)
   (println `(stepping: ,state))
-  (match-define (list expr env env-store k-store cont-addr) state)
+  (match-define (list expr env env-store k-store cont-addr timestamp) state)
   (match expr
     [(? symbol? x)
      ; i think if we add first-class continuations (so then continuations could be in the env-store)
@@ -32,7 +35,8 @@
      (define res-set (hash-ref env-store (hash-ref env x)))
      ; anyways, res-set is a set of (v pprime) lists.
      ; we need to return new states based on each element of res-set.
-     (set-map res-set (lambda (res) (make-state (car res) (cdr res) env-store k-store cont-addr)))]
+     (set-map res-set (lambda (res) (make-state (car res) (cdr res) env-store
+                                                k-store cont-addr (tick timestamp))))]
     [`(,e0 ,e1)
      ; current-ks is all continuations at the current continuation address.
      (define current-ks (hash-ref k-store cont-addr))
@@ -49,7 +53,7 @@
                 (make-state e0 env env-store (hash-update k-store k-addr
                                                           (lambda (k-set) (set-add k-set new-cont))
                                                           (lambda () (set new-cont)))
-                            k-addr)))]
+                            k-addr (tick timestamp))))]
     [`(λ ,xarg ,ebody)
      (define current-ks (hash-ref k-store cont-addr))
      (set-map
@@ -63,14 +67,14 @@
            (make-state e pprime env-store (hash-update k-store k-addr
                                                        (lambda (k-set) (set-add k-set new-cont))
                                                        (lambda () (set new-cont)))
-                       k-addr)]
+                       k-addr (tick timestamp))]
           [`(fn (λ ,x ,e) ,pprime ,c)
            (define env-item (cons expr env))
            (make-state e (hash-set pprime x k-addr)
                        (hash-update env-store k-addr
                                     (lambda (env-set) (set-add env-set env-item))
                                     (lambda () (set env-item)))
-                       k-store c)]
+                       k-store c (tick timestamp))]
           [else (raise `(bad-cont: ,k-addr))])))]
     [else (raise (list 'bad-syntax expr env env-store k-store cont-addr))]))
 
