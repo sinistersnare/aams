@@ -12,12 +12,16 @@
 (define k-value 2)
 
 ; make a state of the machine.
-(struct state (expr env env-store k-store k-addr timestamp) #:transparent)
+(define (state expr env env-store k-store k-addr timestamp)
+  (list 'state expr env env-store k-store k-addr timestamp))
 
 ; a timestamp is a label and a contour
-(struct timestamp (label contour) #:transparent)
+(define (timestamp label contour)
+  (list 'timestamp label contour))
+
 ; an address is a (label or variable) and a contour
-(struct address (label contour) #:transparent)
+(define (address label contour)
+  (list 'address label contour))
 
 
 ; like `take` in the stdlib, but will return the
@@ -29,10 +33,10 @@
 
 (define (tick st kont)
   (match st
-    [(struct state ((cons (? symbol? _) _) _ _ _ _ t)) t]
-    [(struct state ((cons `(,e0 ,e1) elabel) _ _ _ _ (struct timestamp (tlabel contour))))
+    [(list 'state (cons (? symbol? _) _) _ _ _ _ t) t]
+    [(list 'state (cons `(,e0 ,e1) elabel) _ _ _ _ (list 'timestamp tlabel contour))
      (timestamp elabel contour)]
-    [(struct state ((cons `(λ ,xvar ,ebody) elabel) _ _ _ _ (struct timestamp (label contour))))
+    [(list 'state (cons `(λ ,xvar ,ebody) elabel) _ _ _ _ (list 'timestamp label contour))
      (match kont
        ; HELP: intereting that timestamp doesnt change here. Why?
        ; need to understand this whole thing a bit better.
@@ -46,9 +50,9 @@
 
 (define (alloc st kont)
   (match st
-    [(struct state ((cons `(,(cons e0 e0label) ,e1) _) _ _ _ _ (struct timestamp (_ contour))))
+    [(list 'state (cons `(,(cons e0 e0label) ,e1) _) _ _ _ _ (list 'timestamp _ contour))
      (address e0label contour)]
-    [(struct state ((cons `(λ ,_ ,_) _) _ _ k-store k-addr (struct timestamp (_ contour))))
+    [(list 'state (cons `(λ ,_ ,_) _) _ _ k-store k-addr (list 'timestamp _ contour))
      (match kont
        ; HELP: What goes here?
        ['mt (address 'mt contour)]
@@ -68,8 +72,7 @@
 ; move the machine 1 step from a given state.
 ; takes a single state, returns a list of states that can be reached.
 (define (step-aceskt* st)
-  (println `(stepping: ,st))
-  (match-define (struct state (expr env env-store k-store k-addr timestamp)) st)
+  (match-define (list 'state expr env env-store k-store k-addr timestamp) st)
   (match expr
     [(cons (? symbol? x) label)
      ; current-xs is all (v pprime) pairs at the address `x`.
@@ -85,13 +88,6 @@
     [(cons `(,e0 ,e1) label)
      ; current-ks is all continuations at the current continuation address.
      (define current-ks (hash-ref k-store k-addr))
-     ; HELP: So alloc is `alloc(varsigma, k) where k is all current-ks
-     ; but im not sure what to do with `k` in the alloc func,
-     ; update:
-     ; im just gonna use the k itself as the alloc-address!!
-     ; it seems like itll work! But I have no idea what working is!
-     ; so the mt entry is 0 -> mt. Then the next one would be
-     ; mt -> ar(e1 env k-addr)... thats weird.
      (set-map current-ks
               (lambda (current-k)
                 (define b-addr (alloc st current-k))
@@ -159,3 +155,9 @@
 
 (define edges (evaluate '((λ n (λ s (λ z (s ((n s) z))))) (λ s (λ z z)))))
 
+#;(println "digraph G {")
+#;(hash-for-each
+ edges
+ (lambda (src dests)
+   (for-each (lambda (dest) (println (string-append src " -> " dest))) dests)))
+#;(println "}")
