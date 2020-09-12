@@ -1,6 +1,5 @@
 #lang racket
 
-(require (only-in racket/random random-ref))
 (require (only-in racket/hash hash-union))
 
 ; An aCESKt* machine!
@@ -67,10 +66,61 @@
   ; where the stores are Addr -> P(ValueType). 
   (state e (hash) (hash) (hash a0 (set 'mt)) a0 t0))
 
+; The store is a mappingof AddrType -> P(ValType)
+; if the address is not in the mapping, its added as a singleton set
+; if the address is in the mapping, then the val is added to the set
+(define (create-or-add store addr val)
+  (hash-update store addr
+               (lambda (value-set) (set-add value-set val))
+               (lambda () (set val))))
+
+; Move the machine 1 step.
+; As this is an abstract machine, 1 given states returns a list of new states.
+(define (step-aceskt* st)
+  (match-define (list 'state (cons expr label) env env-store k-store k-addr _) st)
+  (define current-ks (hash-ref k-store k-addr))
+  ; the lambda returns a list of states
+  ; so the set-map returns a list of list of states.
+  ; we flatten it so its only a single list.
+  (map
+   append
+   (set-map
+    current-ks
+    (lambda (k)
+      (define b (alloc st k))
+      (define u (tick st k))
+      (match expr
+        [(? symbol? x)
+         (define vals-at-x (hash-ref env-store (hash-ref env x)))
+         (set-map vals-at-x (lambda (vals)
+                              (match-define (cons val envprime) vals)
+                              (state val envprime env-store k-store k-addr (tick st k))))]
+        [`(,e0 ,e1)
+         (list (state e0 env env-store (create-or-add k-store b `(ar ,e1 ,env ,k-addr)) b u))]
+        ;; fix these two
+        [`(if ,e0 ,e1 ,e2)
+         (define new-k `(if ,e1 ,e2 ,env ,k-addr))
+         (define new-k-store (create-or-add k-store b new-k))
+         (list (state e0 env env-store new-k-store b u))]
+        ['#f (match k
+               [`(if ,e0 ,e1 ,pprime ,c) (list (state e1 pprime env-store k-store c u))]
+               ; FIXME: WAT DO HERE
+               [else st])]
+        ; finished with the fix these two section
+        [v
+         (match k
+           [`(ar ,e ,pprime ,c)
+            (list (state e pprime env-store (create-or-add k-store b `(fn ,v ,env ,c)) b u))]
+           [`(fn (λ ,x ,e) ,pprime ,c)
+            (list (state e (hash-set pprime x b)
+                         (create-or-add env-store b (cons v env)) k-store c u))]
+           [`(if ,e0 ,e1 ,pprime ,c)
+            (list (state (if (equal? v #f) e1 e0) pprime env-store k-store c u))])])))))
+
 ; move the machine 1 step from a given state.
 ; takes a single state, returns a list of states that can be reached.
-(define (step-aceskt* st)
-  (match-define (list 'state expr env env-store k-store k-addr timestamp) st)
+#;(define (step-aceskt* st)
+  (match-define (list 'state expr env env-store k-store k-addr _) st)
   (match expr
     [(cons (? symbol? x) (? symbol? label))
      ; current-xs is all (v pprime) pairs at the address `x`.
@@ -116,7 +166,7 @@
                                (lambda () (set env-item)))
                   k-store c (tick st current-k))]
           [else (raise `(bad-cont: ,current-k))])))]
-    [else (raise (list 'bad-syntax expr env env-store k-store k-addr))]))
+    [else (raise (list 'bad-syntax st))]))
 
 ; evaluate from an initial state
 ; this works differently from non-abstract abstract-machines, because here
@@ -127,10 +177,14 @@
 (define (evaluate e)
   ; add labels to `e`.
   (define (label e)
+    (define lab (gensym 'lab))
     (match e
-      [(? symbol? x) (cons x (gensym 'lab))]
-      [`(,e0 ,e1) (cons `(,(label e0) ,(label e1)) (gensym 'lab))]
-      [`(λ ,x ,e) (cons `(λ ,x ,(label e)) (gensym 'lab))]
+      ['#f (cons '#f lab)]
+      ; TODO: numbers!
+      ;[`,(? number? n) (cons n lab)]
+      [(? symbol? x) (cons x lab)]
+      [`(,e0 ,e1) (cons `(,(label e0) ,(label e1)) lab)]
+      [`(λ ,x ,e) (cons `(λ ,x ,(label e)) lab)]
       [else `(labeling-error ,e)]))
   ; go takes a list of states to process and a hash of reached states (and where they lead)
   ; and returns a set of reached states, and where they lead (like an edge-list).
@@ -158,9 +212,9 @@
 ; use the formatting module!
 #;(println "digraph G {")
 #;(hash-for-each
- edges
- (lambda (src dests)
-   (for-each (lambda (dest) (println (string-append src " -> " dest))) dests)))
+   edges
+   (lambda (src dests)
+     (for-each (lambda (dest) (println (string-append src " -> " dest))) dests)))
 #;(println "}")
 
 
