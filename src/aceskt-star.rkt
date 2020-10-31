@@ -32,8 +32,13 @@
 (define (tick st kont)
   (match st
     [(list 'state (cons (? symbol? _) _) _ _ _ _ t) t]
-    [(list 'state (cons `(,e0 ,e1) elabel) _ _ _ _ (list 'timestamp tlabel contour))
+    [(list 'state (cons #f _) _ _ _ _ t) t]
+    [(list 'state (cons `(,e0 ,e1) elabel) _ _ _ _ (list 'timestamp _ contour))
      (timestamp elabel contour)]
+    ; HELP: Idk what to do here, cause i dont truly understand
+    ; the way these work.
+    [(list 'state (cons `(if ,e0 ,e1, e2) iflabel) _ _ _ _ (list 'timestamp _ contour))
+     (timestamp iflabel contour)]
     [(list 'state (cons `(λ ,xvar ,ebody) elabel) _ _ _ _ (list 'timestamp label contour))
      (match kont
        ; HELP: intereting that timestamp doesnt change here. Why?
@@ -43,20 +48,24 @@
        ; the empty list (bullet/nil from AAM) is only allowed in label position,
        ; not contour position. Could cause issues!
        [(list 'fn _ _ _) (timestamp '() (takesafe (cons label contour) k-value))]
-       [else (raise `(bad-kont-tick st: ,st kont: ,kont))])]
+       [else (raise `(bad-kont-tick kont: ,kont st: ,st))])]
     [else (raise `(bad-tick-args st: ,st kont: ,kont))]))
 
 (define (alloc st kont)
   (match st
     [(list 'state (cons `(,(cons e0 e0label) ,e1) _) _ _ _ _ (list 'timestamp _ contour))
      (address e0label contour)]
+    [(list 'state (cons `(if ,e0 ,e1, e2) iflabel) _ _ _ _ (list 'timestamp _ contour))
+     (address iflabel contour)]
+    [(list 'state (cons #f flabel) _ _ _ _ (list 'timestamp _ contour))
+     (address flabel contour)]
     [(list 'state (cons `(λ ,_ ,_) _) _ _ k-store k-addr (list 'timestamp _ contour))
      (match kont
        ['mt (address 'mt contour)]
        [`(ar ,(cons _ elabel) ,_ ,_) (address elabel contour)]
        [`(fn ,(cons `(λ ,x ,_) (? symbol?)) ,_ ,_) (address x contour)]
-       [else (println kont) (raise `(bad-kont-alloc st: ,st kont: ,kont))])]
-    [else (raise `(bad-alloc-args st: ,st kont: ,kont))]))
+       [else (println kont) (raise `(bad-kont-alloc kont: ,kont st: ,st))])]
+    [else (println st) (raise `(bad-alloc-args st: ,st kont: ,kont))]))
 
 ; create an initial state around a closed expression
 (define (inj-aceskt* e)
@@ -77,96 +86,51 @@
 ; Move the machine 1 step.
 ; As this is an abstract machine, 1 given states returns a list of new states.
 (define (step-aceskt* st)
-  (match-define (list 'state (cons expr label) env env-store k-store k-addr _) st)
+  (match-define (list 'state (cons expr (? symbol? label)) env env-store k-store k-addr _) st)
   (define current-ks (hash-ref k-store k-addr))
   ; the lambda returns a list of states
   ; so the set-map returns a list of list of states.
   ; we flatten it so its only a single list.
-  (map
+  (foldl
    append
+   '()
    (set-map
     current-ks
     (lambda (k)
-      (define b (alloc st k))
       (define u (tick st k))
       (match expr
         [(? symbol? x)
+         (println 'sym)
          (define vals-at-x (hash-ref env-store (hash-ref env x)))
          (set-map vals-at-x (lambda (vals)
                               (match-define (cons val envprime) vals)
                               (state val envprime env-store k-store k-addr (tick st k))))]
         [`(,e0 ,e1)
+         (println 'app)
+         (define b (alloc st k))
          (list (state e0 env env-store (create-or-add k-store b `(ar ,e1 ,env ,k-addr)) b u))]
-        ;; fix these two
         [`(if ,e0 ,e1 ,e2)
+         (println 'if)
+         (define b (alloc st k))
          (define new-k `(if ,e1 ,e2 ,env ,k-addr))
          (define new-k-store (create-or-add k-store b new-k))
          (list (state e0 env env-store new-k-store b u))]
-        ['#f (match k
-               [`(if ,e0 ,e1 ,pprime ,c) (list (state e1 pprime env-store k-store c u))]
-               ; FIXME: WAT DO HERE
-               [else st])]
-        ; finished with the fix these two section
         [v
          (match k
            [`(ar ,e ,pprime ,c)
-            (list (state e pprime env-store (create-or-add k-store b `(fn ,v ,env ,c)) b u))]
-           [`(fn (λ ,x ,e) ,pprime ,c)
+            (println 'ark)
+            (define b (alloc st k))
+            (define new-cont `(fn ,(cons v label) ,env ,c))
+            (list (state e pprime env-store (create-or-add k-store b new-cont) b u))]
+           [`(fn ,(cons `(λ ,x ,e) fnlabel) ,pprime ,c)
+            (println 'fnk)
+            (define b (alloc st k))
             (list (state e (hash-set pprime x b)
-                         (create-or-add env-store b (cons v env)) k-store c u))]
+                         (create-or-add env-store b (cons (cons v fnlabel) env)) k-store c u))]
            [`(if ,e0 ,e1 ,pprime ,c)
-            (list (state (if (equal? v #f) e1 e0) pprime env-store k-store c u))])])))))
-
-; move the machine 1 step from a given state.
-; takes a single state, returns a list of states that can be reached.
-#;(define (step-aceskt* st)
-  (match-define (list 'state expr env env-store k-store k-addr _) st)
-  (match expr
-    [(cons (? symbol? x) (? symbol? label))
-     ; current-xs is all (v pprime) pairs at the address `x`.
-     ; current-ks is all continuations at the address `k-addr`
-     ; we need to return new states based on each combo of those two.
-     (define current-xs (set->list (hash-ref env-store (hash-ref env x))))
-     (define current-ks (set->list (hash-ref k-store k-addr)))
-     (define products (cartesian-product current-xs current-ks))
-     (map (lambda (product)
-            (match-define `(,(cons val storeprime) ,k) product)
-            (state val storeprime env-store k-store k-addr (tick st k)))
-          products)]
-    [(cons `(,e0 ,e1) (? symbol? label))
-     ; current-ks is all continuations at the current continuation address.
-     (define current-ks (hash-ref k-store k-addr))
-     (set-map current-ks
-              (lambda (current-k)
-                (define b-addr (alloc st current-k))
-                (define new-cont `(ar ,e1 ,env ,k-addr))
-                (state e0 env env-store (hash-update k-store b-addr
-                                                     (lambda (k-set) (set-add k-set new-cont))
-                                                     (lambda () (set new-cont)))
-                       b-addr (tick st current-k))))]
-    [(cons `(λ ,xarg ,ebody) (? symbol? label))
-     (define current-ks (hash-ref k-store k-addr))
-     (set-map
-      current-ks
-      (lambda (current-k)
-        (define b-addr (alloc st current-k))
-        (match current-k
-          ['mt st] ; at a fixpoint, return state
-          [`(ar ,e ,pprime ,c)
-           (define new-cont `(fn ,(cons `(λ ,xarg ,ebody) label) ,env ,c))
-           (state e pprime env-store (hash-update k-store b-addr
-                                                  (lambda (k-set) (set-add k-set new-cont))
-                                                  (lambda () (set new-cont)))
-                  b-addr (tick st current-k))]
-          [`(fn ,(cons `(λ ,x ,e) (? symbol? fnlabel)) ,pprime ,c)
-           (define env-item (cons (cons `(λ ,xarg ,ebody) fnlabel) env))
-           (state e (hash-set pprime x b-addr)
-                  (hash-update env-store b-addr
-                               (lambda (env-set) (set-add env-set env-item))
-                               (lambda () (set env-item)))
-                  k-store c (tick st current-k))]
-          [else (raise `(bad-cont: ,current-k))])))]
-    [else (raise (list 'bad-syntax st))]))
+            (println 'ifkont)
+            (list (state (if (equal? v #f) e1 e0) pprime env-store k-store c u))]
+           [else (raise `(bad-match ,st))])])))))
 
 ; evaluate from an initial state
 ; this works differently from non-abstract abstract-machines, because here
@@ -182,10 +146,11 @@
       ['#f (cons '#f lab)]
       ; TODO: numbers!
       ;[`,(? number? n) (cons n lab)]
+      [`(if ,e0 ,e1 ,e2) (cons `(if ,(label e0) ,(label e1) ,(label e2)) lab)]
       [(? symbol? x) (cons x lab)]
       [`(,e0 ,e1) (cons `(,(label e0) ,(label e1)) lab)]
       [`(λ ,x ,e) (cons `(λ ,x ,(label e)) lab)]
-      [else `(labeling-error ,e)]))
+      [else (raise `(labeling-error ,e))]))
   ; go takes a list of states to process and a hash of reached states (and where they lead)
   ; and returns a set of reached states, and where they lead (like an edge-list).
   (define (go states reached)
@@ -208,6 +173,7 @@
 (define edges (evaluate '((λ x (x x)) (λ x (x x)))))
 ; (step-aceskt* (state '(λ x (((x . lab1) (x . lab2)) . lab3)) '() '() '() '() '()))
 ; (step-aceskt* (state '(λ x (((x . lab99679) (x . lab99680)) . lab99681)) '() '() '() '() '()))
+(evaluate '((λ x x) (if #f (λ x (x x)) (λ x x))))
 
 ; use the formatting module!
 #;(println "digraph G {")
@@ -225,3 +191,5 @@
     [`(,efn ,earg) `(,(unwrap efn) ,(unwrap earg))]
     [`(λ (,(? symbol? fnarg)) ,e) `(λ ,fnarg ,(unwrap e))]))
 (define (eu e) (evaluate (unwrap e)))
+
+

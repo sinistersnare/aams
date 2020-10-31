@@ -12,6 +12,8 @@ Here are the (some?) of the machines to implement. Most of them I haven't implem
 `CESKt*` adds a time-stamp to `CESK*`, to abstract GC use.
 `aCESKt*` abstracted `CESKt*`, for use in static analysis.
 
+These Abstract Machines are small-step machines.
+
 ## What is an Abstract Machine? ##
 
 Abstract Machines are a formalism of interpreters of programming languages,
@@ -29,7 +31,7 @@ a new CEK is produced, with which we can run the machine again.
 ## What happens when you A-ify an AM? ##
 
 An Abstract Machine will produce a value given a program.
-But during the static-analysis phase of a compiler, we can not 
+But during the static-analysis phase of a compiler, we can not
 simply run the program, as we dont have the necessary inputs.
 
 By abstracting an abstract machine we can theorize possible inputs
