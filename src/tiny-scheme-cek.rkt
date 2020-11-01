@@ -41,6 +41,9 @@
 (define (addk evald unevald env kont)
   (list 'addk evald unevald env kont))
 
+(define (letk name body env kont)
+  (list 'letk name body env kont))
+
 (define (value? exp)
   (match exp
     [`(λ ,_ ,_) #t]
@@ -114,7 +117,13 @@
         (define new-evald (cons ctrl evald))
         (define new-addk (addk new-evald rest oldenv next-kont))
         ; make sure to evaluate the arg with the env it was made in.
-        (state arg oldenv new-addk)])]
+        (state arg oldenv new-addk)]
+       [`(letk ,name ,body ,old-env ,next-kont)
+        (if (symbol? name)
+            ; HELP: is this the correct env?
+            (let ([new-env (hash-set old-env name (cons ctrl env))])
+              (state body new-env next-kont))
+            (list 'error `(binding ,name must be a symbol)))])]
     ; a simple conditional.
     ; the only way to take the false branch is if `econd` evaluates to `#f`.
     [`(if ,econd ,et ,ef)
@@ -125,6 +134,9 @@
      ; for consistency just evaluate the identity first.
      ; this way we dont need to split the args and `(+)` works.
      (state 0 env add-kont)]
+    [`(let (,name ,exp) ,body)
+     (define let-kont (letk name body env kont))
+     (state exp env let-kont)]
     ; first evaluate the fn part
     ; and place an ar frame to eval the argument
     ; and then to evaluate the application expression as a whole.
@@ -160,7 +172,6 @@
                   st
                   (run nextst))]))
   (run state0))
-
 
 (define e evaluate)
 
