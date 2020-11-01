@@ -15,6 +15,7 @@
 ; When we call `evaluate` the store is reset.
 ; this is a mapping from a symbol to a set of values.
 ; All are possible inhabitants of the symbol.
+; TODO: change it to a cooler thing than a powerset lattice!
 (define store (make-hash))
 
 (define (value? exp)
@@ -30,6 +31,7 @@
 (define (letf name body kont) (list 'letf name body kont))
 (define (iff et ef kont) (list 'iff et ef kont))
 
+; the value should be a hash-set cause rn it can copy the same value.
 (define (update bnd)
   (match-define (cons name val) bnd)
   (hash-update! store name
@@ -38,8 +40,10 @@
 
 (define (step st)
   (match-define `(state ,ctrl ,kont) st)
+  #;(displayln `(ctrl: ,ctrl ,(value? ctrl)))
   (match ctrl
     [(? value?)
+     #;(displayln 'atomic)
      (match kont
        ['mt '()]
        [`(appf ,evald-incomplete () ,next-kont)
@@ -67,14 +71,19 @@
         (update (cons name ctrl))
         (list (state body next-kont))])]
     [`(+ ,es ...)
+     #;(displayln 'add)
      (list (state 0 (addf '() es kont)))]
     [`(if ,econd ,et ,ef)
+     #;(displayln 'if)
      (list (state econd (iff et ef kont)))]
     [`(let (,name ,exp) ,body)
+     #;(displayln 'let)
      (list (state exp (letf name body kont)))]
     [`(,ef ,es ...)
+     #;(displayln `(appl ,ef and ,es))
      (list (state ef (appf '() es kont)))]
     [(? symbol?)
+     #;(displayln 'sym)
      (map (λ (val) (state val kont))
           (hash-ref store ctrl))]))
 
@@ -95,8 +104,9 @@
 
 (define e evaluate)
 
-(e '(let (a (+ 1 2)) (if #f (+ a a) (let (b (+ a a a)) (+ b b)))))
-store
+#;(e '(let (a (+ 1 2)) (if #f (+ a a) (let (b (+ a a a)) (+ b b)))))
+#;(e '((λ (u) (u u)) (λ (u) (u u))))
+#;store
 
 
 
