@@ -9,6 +9,10 @@
 ; Im gonna turn this into a CFA (tiny-0cfa.rkt) later.
 ; No store is needed unlike the AAM paper becuase
 ; the allocation function is just `identity`.
+; so the CFA will need to be a CESK* so continuations dont get loopy
+; in a program like
+#; (e '((λ (u y) (+ y (u u y))) (λ (u y) (+ y (u u y))) 1))
+; where the continuation always grows so we never hit a fixpoint.
 
 ; we will turn it abstract soon by not overwriting env-additions
 ; and then we need to globalize the env also.
