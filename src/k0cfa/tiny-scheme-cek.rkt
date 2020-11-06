@@ -1,9 +1,12 @@
 #lang racket
 
 (require (only-in racket/hash hash-union))
+(require (only-in "abstract-type-lattice.rkt"
+                  avalue avalue?))
+(require (only-in "tiny-0cfa.rkt"
+                  [evaluate cfa-evaluate]))
 
 (define ERROR-SIGIL (gensym 'err))
-
 
 ; A more fully-featured CEK machine.
 ; Im gonna turn this into a CFA (tiny-0cfa.rkt) later.
@@ -47,6 +50,9 @@
 
 (define (letk name body env kont)
   (list 'letk name body env kont))
+
+(define (unsafe-addk evald unevald env kont)
+  (list 'unsafe-addk evald unevald env kont))
 
 (define (value? exp)
   (match exp
@@ -122,6 +128,15 @@
         (define new-addk (addk new-evald rest oldenv next-kont))
         ; make sure to evaluate the arg with the env it was made in.
         (state arg oldenv new-addk)]
+       [`(unsafe-addk ,evald () ,oldenv ,next-kont)
+        ; we dont need to do type checking cause its UNSAFE!
+        ; (AKA its not our job to verify the args of the addition here)
+        (state (apply + (cons ctrl evald)) next-kont)]
+       [`(unsafe-addk ,evald (,arg ,rest ...) ,oldenv ,next-kont)
+        (define new-evald (cons ctrl evald))
+        (define new-addk (unsafe-addk new-evald rest oldenv next-kont))
+        ; make sure to evaluate the arg with the env it was made in.
+        (state arg oldenv new-addk)]
        [`(letk ,name ,body ,old-env ,next-kont)
         (if (symbol? name)
             ; HELP: is this the correct env?
@@ -179,15 +194,53 @@
 
 (define e evaluate)
 
+(define (optimize-plus exp cfg store)
+  (define (go e)
+    (define (guaranteed-number? e)
+      (match e
+        [(? value? val)
+         (match val
+           [(? number?) #t]
+           [else #f])]
+        [(? symbol?)
+         (define val (hash-ref store e))
+         (match val
+           [(avalue (== number?) _) #t]
+           [(avalue _ _) #f])]
+        ; too complex... what do... How traverse CFG?
+        [else  #f]))
+    (define (guaranteed-all-numbers? es)
+      (match es
+        ['() #t]
+        [`(,head ,tail ...) (and (guaranteed-number? head) (guaranteed-all-numbers? tail))]))
+    (match e
+      [(? value?) e]
+      [`(if ,ec ,et ,ef) `(if ,(go ec)
+                              ,(go et)
+                              ,(go ef))]
+      [`(+ ,es ...)
+       (if (guaranteed-all-numbers? es)
+           `(unsafe+ ,@(map go es))
+           `(+ ,@(map go es)))]
+      [`(let (,(? symbol? x) ,e) ,body)
+       `(let (,x ,(go e)) ,(go body))]
+      [`(,ef ,es ...)
+       (map go (cons ef es))]
+      [(? symbol? x) x]))
+  (go exp))
 
 
 
+#;(define letadd '(let (a 1) (let (b 2) (+ a b 3))))
+#;(match-define (cons letadd-cfg letadd-store) (cfa-evaluate letadd))
+#;(optimize-plus letadd letadd-cfg letadd-store)
 
 
 
-
-
-
+(define (optimize e)
+  (match-define (cons cfg store) (cfa-evaluate e))
+  (optimize-plus e cfg store))
+(define o optimize) ; ;)
 
 
 
