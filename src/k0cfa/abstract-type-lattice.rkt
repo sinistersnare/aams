@@ -30,7 +30,7 @@
 ; takes a concrete value and turns it into an abstract value
 (define (make-abstract v)
   (match v
-    [(? abstraction?) (avalue abstraction? (set v))]
+    [`(λ ,args ,body) (avalue abstraction? (set `(λ ,args ,(abstractify body))))]
     [(? boolean?) (avalue boolean? (set))]
     [(? number?) (avalue number? (set))]
     ; TODO: how do we deal with (polymorphic?) types like lists,
@@ -44,16 +44,16 @@
 (define (abstractify e)
   (match e
     [(? concrete-value?) (make-abstract e)]
-    [`(+ ,es ...) `(+ ,@(map abstractify es))]
     [`(if ,ec ,et ,ef) `(if ,(abstractify ec) ,(abstractify et) ,(abstractify ef))]
     [`(let (,(? symbol? x) ,e) ,body) `(let (,x ,(abstractify e)) ,(abstractify body))]
+    [`(+ ,es ...) `(+ ,@(map abstractify es))] ; should be covered by application case.
     [`(,ef ,es ...) `(,(abstractify ef) ,@(map abstractify es))]
     [(? symbol?) e]))
 
 (define (join-value v1 v2)
   (match-define (avalue v1type v1abstrs) v1)
   (match-define (avalue v2type v2abstrs) v2)
-  ; cause my match wasnt working for some reason
+  ; cause my match expression wasnt working for some reason
   (if (eq? v1type 'BOTTOM) (avalue v2type (set-union v1abstrs v2abstrs))
       (if (eq? v2type 'BOTTOM) (avalue v1type (set-union v1abstrs v2abstrs))
           (if (equal? v1type v2type) (avalue v1type (set-union v1abstrs v2abstrs))
@@ -63,15 +63,15 @@
 ; abstract function implementations.
 ;
 
-; shouldnt abstract-+ return a list of possibilities?
-(define (abstract-+ val res)
-  (match-define (avalue valtype valabstrs) val)
-  (match-define (avalue restype resabstrs) res)
-  (if (and (eq? number? valtype) (eq? number? restype))
-      ; if theyre both numbers, they return a number.
-      ; if at least one of them isnt a number, just return top.
-      (avalue number? (set-union valabstrs resabstrs))
-      (avalue 'TOP (set-union valabstrs resabstrs))))
+(define (abstract-+ args next-kaddr)
+  (list
+   (state (foldl (λ (n accum)
+                   (match-define (avalue ntype nabstrs) n)
+                   (match-define (avalue accumtype accumabstrs) accum)
+                   (if (and (eq? number? ntype) (eq? number? accumtype))
+                       accum
+                       (avalue 'TOP (set-union nabstrs accumabstrs))))
+                 (make-abstract 0) args) next-kaddr)))
 
 ; uhhhh... not sure what todo here.
 (define (abstract-car xs next-kaddr)
@@ -94,7 +94,14 @@
                       (define zipped (map cons fnargs (cdr args)))
                       (for-each update-store zipped)
                       (state fnbody next-kaddr)]
-                     [else (raise 'not-given-abstraction-somehow)]))))
+                     [else (displayln abstrs) (raise 'not-given-abstraction-somehow)]))))
+
+
+
+
+
+
+
 
 
 

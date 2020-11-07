@@ -1,10 +1,11 @@
 #lang racket
 
-(require (only-in racket/hash hash-union))
+(require (only-in racket/hash
+                  hash-union))
 (require (only-in "abstract-type-lattice.rkt"
                   avalue avalue?))
 (require (only-in "tiny-0cfa.rkt"
-                  [evaluate cfa-evaluate]))
+                  optimize))
 
 (define ERROR-SIGIL (gensym 'err))
 
@@ -183,64 +184,17 @@
 
 ; iterates an initial state until fixpoint
 (define (evaluate e)
-  (define state0 (inject e))
+  (define optimized-prog (optimize e))
+  (define state0 (inject optimized-prog))
   (define (run st)
     (match (step-concrete st)
-      [(list 'error e) `(ERR: ,e)]
+      [(list 'error err) `(ERR: ,err)]
       [nextst (if (steq? nextst st)
                   st
                   (run nextst))]))
   (run state0))
 
 (define e evaluate)
-
-(define (optimize-plus exp cfg store)
-  (define (go e)
-    (define (guaranteed-number? e)
-      (match e
-        [(? value? val)
-         (match val
-           [(? number?) #t]
-           [else #f])]
-        [(? symbol?)
-         (define val (hash-ref store e))
-         (match val
-           [(avalue (== number?) _) #t]
-           [(avalue _ _) #f])]
-        ; too complex... what do... How traverse CFG?
-        [else  #f]))
-    (define (guaranteed-all-numbers? es)
-      (match es
-        ['() #t]
-        [`(,head ,tail ...) (and (guaranteed-number? head) (guaranteed-all-numbers? tail))]))
-    (match e
-      [(? value?) e]
-      [`(if ,ec ,et ,ef) `(if ,(go ec)
-                              ,(go et)
-                              ,(go ef))]
-      [`(+ ,es ...)
-       (if (guaranteed-all-numbers? es)
-           `(unsafe+ ,@(map go es))
-           `(+ ,@(map go es)))]
-      [`(let (,(? symbol? x) ,e) ,body)
-       `(let (,x ,(go e)) ,(go body))]
-      [`(,ef ,es ...)
-       (map go (cons ef es))]
-      [(? symbol? x) x]))
-  (go exp))
-
-
-
-#;(define letadd '(let (a 1) (let (b 2) (+ a b 3))))
-#;(match-define (cons letadd-cfg letadd-store) (cfa-evaluate letadd))
-#;(optimize-plus letadd letadd-cfg letadd-store)
-
-
-
-(define (optimize e)
-  (match-define (cons cfg store) (cfa-evaluate e))
-  (optimize-plus e cfg store))
-(define o optimize) ; ;)
 
 
 

@@ -1,13 +1,13 @@
 #lang racket
 
-(provide evaluate)
+(provide optimize)
 
 (require (only-in racket/hash hash-union))
 
 ; the file should be able to be swapped out more or less per lattice-type.
 ; a really shitty and unsafe type-clas system hahaha
 (require (only-in "abstract-type-lattice.rkt"
-                  join-value bottom
+                  join-value bottom avalue
                   abstract-+ abstract-car abstract-cdr abstract-if abstract-app
                   make-abstract avalue? abstractify))
 
@@ -43,7 +43,7 @@
    ; simple and clean!
    kstore ctrl
    (λ (storage) (set-add storage kont))
-   (λ () (set)))
+   set)
   ctrl)
 
 ; use a global store of values, separated from the state.
@@ -71,7 +71,7 @@
    ; bottom is an empty list
    ; top is the symbol 'TOP.
    ; and a value is the value... easy to figure out! Who needs well typed sum types!
-   (λ () bottom)))
+   bottom))
 
 ; this steps when the control is an atomic value
 ; so it needs to check the continuation to see what to do next.
@@ -88,8 +88,7 @@
      (define nkaddr (update-kstore ctrl (appf evald rest next-kaddr)))
      (list (state next nkaddr))]
     [`(addf ,evald-incomplete () ,next-kaddr)
-     (define evald (cons ctrl evald-incomplete))
-     (list (state (foldl abstract-+ (make-abstract 0) evald) next-kaddr))]
+     (abstract-+ (cons ctrl evald-incomplete) next-kaddr)]
     [`(addf ,evald-incomplete (,next ,rest ...) ,next-kaddr)
      (define evald (cons ctrl evald-incomplete))
      (define nkaddr (update-kstore ctrl (addf evald rest next-kaddr)))
@@ -109,9 +108,7 @@
   #;(displayln `(ctrl: ,ctrl))
   (match ctrl
     [(? avalue?)
-     (foldl append '()
-            (set-map (hash-ref kstore kaddr)
-                     (λ (k) (step-value ctrl k))))]
+     (foldl append '() (set-map (hash-ref kstore kaddr) (λ (k) (step-value ctrl k))))]
     [`(+ ,es ...)
      #;(displayln 'add)
      (define nkaddr (update-kstore ctrl (addf '() es kaddr)))
@@ -129,6 +126,7 @@
      (list (state exp nkaddr))]
     [`(,ef ,es ...)
      #;(displayln `(appl ,ef and ,es))
+     ;(displayln `(currentk: ,(hash-ref kstore kaddr)))
      (define nkaddr (update-kstore ctrl (appf '() es kaddr)))
      (list (state ef nkaddr))]
     [(? symbol?)
@@ -149,32 +147,98 @@
                                (lambda (s) (hash-has-key? union-reached s))))
     (if (empty? todo-states) union-reached (go todo-states union-reached)))
   (define cfg (go (list (inject (abstractify e))) (hash)))
-  (cons cfg store))
+  (list cfg store kstore))
+
+(define (optimize-plus exp cfg store kstore)
+  (define (go e)
+    (define (guaranteed-number? e)
+      (match e
+        [(? concrete-value? val)
+         (match val
+           [(? number?) #t]
+           [else #f])]
+        ; maybe we could combine this with an analysis on which branch is taken?
+        ; right now i always take both, so we dont care.
+        [`(if ,_ ,et ,ef) (and (guaranteed-number? et) (guaranteed-number? ef))]
+        [`(+ ,es ...) (andmap guaranteed-number? es)]
+        [`(let ,_ ,letbody) (guaranteed-number? letbody)]
+        [`(,ef ,es ...)
+         (define k-at-appl (search-for-ks cfg kstore (abstractify e)))
+         (assert (= (length k-at-appl) 1) 'k-at-appl) ; idk what to do in this case yet.
+         (define ctrls-with-k (get-ctrls-with-k cfg kstore (car k-at-appl)))
+         (define relevant (filter avalue? ctrls-with-k))
+         (assert (= (length relevant) 1) 'relevant) ; idk what to do in this case yet.
+         (equal? (avalue number? (set)) (car relevant))]
+        [(? symbol?)
+         (define val (hash-ref store e))
+         (match val
+           [(avalue (== number?) _) #t]
+           [(avalue _ _) #f])]))
+    (define (guaranteed-all-numbers? es)
+      (match es
+        ['() #t]
+        [`(,head ,tail ...) (and (guaranteed-number? head) (guaranteed-all-numbers? tail))]))
+    (match e
+      [`(λ ,args ,body) `(λ ,args ,(go body))]
+      [(? concrete-value?) e]
+      [`(if ,ec ,et ,ef) `(if ,(go ec)
+                              ,(go et)
+                              ,(go ef))]
+      [`(+ ,es ...)
+       (if (guaranteed-all-numbers? es)
+           `(unsafe+ ,@(map go es))
+           `(+ ,@(map go es)))]
+      [`(let (,(? symbol? x) ,e) ,body)
+       `(let (,x ,(go e)) ,(go body))]
+      [`(,ef ,es ...)
+       (map go (cons ef es))]
+      [(? symbol? x) x]))
+  (go exp))
+
+
+
+#;(define letadd '(let (a 1) (let (b 2) (+ a b 3))))
+#;(match-define (cons letadd-cfg letadd-store) (evaluate letadd))
+#;(optimize-plus letadd letadd-cfg letadd-store)
+
+(define (optimize e)
+  (match-define (list cfg store kstore) (evaluate e))
+  (optimize-plus e cfg store kstore))
 
 (define e evaluate)
+(define o optimize)
 
-(define (pgraph cfg)
-  (define o (open-output-string))
-  (hash-for-each
-   cfg
-   (λ (k vs)
-     (fprintf o "~a ->~n" k)
-     (for-each (λ (v) (fprintf o "\t~a~n" v)) vs)))
-  (get-output-string o))
+#;(o '(let (a (if #t 1 3)) (+ (if #f #t 1) (+ a (+ a a) 1 (if #t 1 2)))))
 
-#;(e '(let (a (+ 1 2)) (if #f (+ a a) (let (b (+ a a a)) (+ b b)))))
-; (e '((λ (u) (u u)) (λ (u) (u u))))
-#;store
+(define (assert v reason)
+  (if (not v) (raise reason)
+      (void)))
 
-; infinite loop in a nonterminating machine!
-; (e '((λ (u y) (+ y (u u y))) (λ (u y) (+ y (u u y))) 1))
+; gets the all continuations related to the given control.
+(define (search-for-ks cfg kstore exp)
+  (foldl (λ (st accum)
+           (match-define `(state ,ctrl ,k) st)
+           (if (equal? ctrl exp)
+               (cons (hash-ref kstore k) accum)
+               accum))
+         '() (hash-keys cfg)))
 
-; kstore
-#;(e '(let (a 5) (+ a a)))
-#;store
-; (define paths (e '(let (a 5) (+ a a))))
+(define (get-ctrls-with-k cfg kstore k)
+  (foldl (λ (st accum)
+           (match-define `(state ,ctrl ,kaddr) st)
+           (define kont (hash-ref kstore kaddr))
+           (if (subset? k kont)
+               (cons ctrl accum)
+               accum))
+         '() (hash-keys cfg)))
 
-#;(e '(let (a 1) (let (b 2) (+ a b 2))))
+
+#;(match-define (list ocfg ostore okstore)
+  (e '(let (f (λ (x) (+ x 1))) (+ 2 (f 1)))))
+#;(o '(let (f (λ (x) (+ x 1))) (+ 2 (f 1))))
+
+
+
 
 
 
