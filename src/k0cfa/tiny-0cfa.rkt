@@ -237,6 +237,8 @@
   (e '(let (f (λ (x) (+ x 1))) (+ 2 (f 1)))))
 #;(o '(let (f (λ (x) (+ x 1))) (+ 2 (f 1))))
 
+; this shouldnt optimize the body of the let cause vvvvvvv...
+(o '(let (f (if #t (λ (x) (+ x 1)) (λ (x) (+ x (if #t 1 #f))))) (+ 2 (f 1))))
 
 
 
