@@ -1,0 +1,140 @@
+\title{CESK* / CFA Formalism}
+\author{
+	Davis Silverman
+}
+\date{}
+
+\documentclass[12pt,draft]{article}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{tikz}
+\usepackage{titling}
+%\usepackage{bm}
+
+\setlength{\droptitle}{-10em}  % Make title not in middle of page (uses titling package)
+\def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;}
+\newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
+\begin{document}
+
+% \maketitle
+
+\section{Formalization of a CESK* machine with basic Scheme features.}
+
+But the Store is globalized, so CEK* with a global store.
+
+
+\begin{align*}
+\varsigma \in \Sigma &= \textsf{Exp} \times \textsf{Env} \times \textsf{Kont} \\
+op \in \textsf{Primitive} &\;\;\;\;\;\; \text{The set of primitves} \\
+\psi \in \textsf{PrimStore} &= Var \rightharpoonup \textsf{Primitive} \\
+v \in \textsf{Val} &::= (\lambda \; (x \; ...) \; e) \;|\; op \;|\; \;\text{\#t}\; | \;\text{\#f}\; | \;0\; | \;1\; ... \\
+x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers} \\
+e \in \textsf{Exp} &::= x  \;|\; v \;|\; (\text{if} \; e \; e \; e) \;|\; (let \; (x \; e) \; e) \;|\; (e \; e \; ...)  \\
+\textsf{a,b,c} \in \textsf{Addr} &\;\;\;\;\;\; \text{A set of addresses} \\
+\rho \in \textsf{Env} &= \textsf{Var} \rightharpoonup \textsf{Addr} \\
+\sigma \in \textsf{Store} &= \textsf{Addr} \rightharpoonup (\textsf{Val} \times \textsf{Env}) \\
+done &= \text{list of } \textsf{Val} \\
+todo &= \text{list of } \textsf{Exp} \\
+\kappa \in \textsf{Kont} &= \textbf{mt} \;|\; \textbf{appf}(done, todo, \rho, a) \\
+					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{iff}(e, e, \rho, a) \\
+					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{letf}(x, e, \rho, a) \\
+\\
+alloc(\varsigma) &= \text{a new address} \\
+\text{Our transition function is of type} \\
+(\Sigma \times \textsf{Store}) &\rightarrow (\Sigma \times \textsf{Store})
+\end{align*}
+
+\begin{center}
+\begin{tabular}{l | r}
+\multicolumn{2}{c}{$(\varsigma \times \sigma) \rightarrow (\varsigma' \times \sigma)$, 
+where $\kappa = \sigma(a) , b = alloc(\varsigma) $} \\
+\multicolumn{2}{c}{proceed by matching on $\varsigma$} \\
+\hline
+$\langle x , \rho , a \rangle$ 
+& $\langle v , \rho' , a \rangle$ \\
+& where $(v , \rho') = \sigma(\rho(x))$ \\
+\hline
+$\langle x , \rho , a \rangle$ 
+& $\langle op , \rho , a \rangle$ \\
+& where $x \not\in \rho$ and $ op = \psi(x) $ \\
+\hline
+$\langle (e_0 \; e_z ...) , \rho , a \rangle$ 
+& $\langle e_0 , \rho , b \rangle$ \\
+& $ \sigma = \sigma[b \longmapsto \textbf{appf}([\:], e_z , \rho , a)]$ \\
+\hline
+$\langle (\text{if} \; e_c \; e_t \; e_f) , \rho , a \rangle$ 
+& $\langle e_c , \rho , b \rangle$ \\
+& $ \sigma = \sigma[b \longmapsto \textbf{iff}(e_t , e_f , \rho , a)] $ \\
+\hline
+$ \langle (\text{let} \;(x \;e_0)\; e_1) , \rho , a\rangle $
+& $ \langle e_0 , \rho , b \rangle $ \\
+& $ \sigma = \sigma[b \longmapsto \textbf{letf}(x , e_1 , \rho , a)] $ \\
+\hline
+$\langle v , \rho , a \rangle$ & \\
+match on $\kappa$ below \\
+\hline
+\textbf{mt}
+& $\varsigma$ \\
+\hline
+$\textbf{appf}((op :: (vs...) , [\:] , \rho' , c) $ 
+& $ \langle v' , \rho' , c \rangle $ \\ 
+& $ v' $ = $op$ applied to $(vs \mdoubleplus [v])$ \\
+\hline
+$ \textbf{appf}((\lambda (xs ...) e) :: (vs...) , [\:] , \rho' , c) $
+& $ \langle e , \rho'[xs_0 \longmapsto b_0 ... xs_i \longmapsto b_i] , c \rangle $ \\
+& $ vs = vs \mdoubleplus [v]$\\
+& $\sigma = \sigma[b_0 \mapsto (vs_0, \rho) ... b_i \mapsto (vs_i, \rho)] $ \\
+\hline
+$\textbf{appf}(dn , h::(t...) , \rho' , c) $
+& $ \langle h , \rho' , b \rangle $ \\
+& $ \sigma = \sigma[b \longmapsto \textbf{appf}(dn \mdoubleplus	 [v] , t , \rho' , c)] $ \\
+\hline
+$\textbf{iff}(e_t , e_f , \rho' , c) $ 
+& $ \langle e_f , \rho' , c \rangle $ \\
+if $ v = \text{\#f} $ &  \\
+\hline
+$\textbf{iff}(e_t , e_f , \rho' , c) $ 
+& $ \langle e_t , \rho' , c \rangle $ \\
+if $ v \neq \text{\#f} $ & \\
+\hline
+$\textbf{letf}(x, e, \rho', c) $
+& $ \langle e, \rho'[x \longmapsto b] , c \rangle $ \\
+& $ \sigma = \sigma[b \longmapsto (v, \rho)] $ \\
+\hline
+\end{tabular}
+\end{center}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}
+  
