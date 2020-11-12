@@ -17,35 +17,56 @@
 \setlength{\droptitle}{-10em}  % Make title not in middle of page (uses titling package)
 \def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;}
 \newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
+\setcounter{section}{-1}
 \begin{document}
 
-% \maketitle
+\newcommand{\lamsyn}[2]{(\lambda\;(#1 ...)\;#2)}
+\newcommand{\letsyn}[3]{(\texttt{let}\;(#1\;#2)\;#3)}
+\newcommand{\ifsyn}[3]{(\texttt{if}\;#1\;#2\;#3)}
+\newcommand{\primsyn}[3]{(\texttt{prim}\;#1\;#2\;#3 ...)}
+\newcommand{\truesyn}{\texttt{\#t}}
+\newcommand{\falsesyn}{\texttt{\#f}}
+
+% textit for semantic domains
+% textsf for syntactic domains
+
 
 \section{Formalization of a CESK* machine with basic Scheme features.}
 
-But the Store is globalized, so CEK* with a global store.
-
-
 \begin{align*}
 \varsigma \in \Sigma &= \textsf{Exp} \times \textsf{Env} \times \textsf{Kont} \\
-op \in \textsf{Primitive} &\;\;\;\;\;\; \text{The set of primitves} \\
-\psi \in \textsf{PrimStore} &= Var \rightharpoonup \textsf{Primitive} \\
-v \in \textsf{Val} &::= (\lambda \; (x \; ...) \; e) \;|\; op \;|\; \;\text{\#t}\; | \;\text{\#f}\; | \;0\; | \;1\; ... \\
+op \in \textit{Primitive} &\;\;\;\;\;\; \text{The set of primitves} \\
+\mathit{clo} \in \mathit{Clo} &= \lamsyn{x}{e} \times \textsf{Env} \\
+\textsf{Bool} &::= \truesyn \;|\; \falsesyn \\
+v \in \textsf{AExp} &= \mathit{Clo} \;+\; \textsf{Bool} \;+\; \mathbb{Z} \\
 x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers} \\
-e \in \textsf{Exp} &::= x  \;|\; v \;|\; (\text{if} \; e \; e \; e) \;|\; (let \; (x \; e) \; e) \;|\; (e \; e \; ...)  \\
-\textsf{a,b,c} \in \textsf{Addr} &\;\;\;\;\;\; \text{A set of addresses} \\
-\rho \in \textsf{Env} &= \textsf{Var} \rightharpoonup \textsf{Addr} \\
-\sigma \in \textsf{Store} &= \textsf{Addr} \rightharpoonup (\textsf{Val} \times \textsf{Env}) \\
-done &= \text{list of } \textsf{Val} \\
-todo &= \text{list of } \textsf{Exp} \\
-\kappa \in \textsf{Kont} &= \textbf{mt} \;|\; \textbf{appf}(done, todo, \rho, a) \\
-					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{iff}(e, e, \rho, a) \\
-					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{letf}(x, e, \rho, a) \\
+e \in \textsf{Exp} &::= x  \;|\; v \;|\; \lamsyn{x}{e} \\
+				  &	\;\;\;\;\;\;\;\;\; \;|\; \ifsyn{e}{e}{e}  \\
+				  &	\;\;\;\;\;\;\;\;\; \;|\; \letsyn{x}{e}{e} \\
+				  &	\;\;\;\;\;\;\;\;\; \;|\; \primsyn{op}{e}{e} \\
+				  &	\;\;\;\;\;\;\;\;\; \;|\; (e \; e \; ...) \\
+a,b,c \in \textit{Addr} &\;\;\;\;\;\; \text{A set of addresses} \\
+\rho \in \textsf{Env} &= \textsf{Var} \rightharpoonup \textit{Addr} \\
+\sigma \in \textsf{Store} &= \textit{Addr} \rightharpoonup \textsf{AExp} \\
+done &= \textsf{Val*} \\
+todo &= \textsf{Exp*} \\
+\kappa \in \textsf{Kont} &= \textbf{mt} \;|\; \textbf{appk}(done, todo, \rho, a) \\
+					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{ifk}(e, e, \rho, a) \\
+					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{letk}(x, e, \rho, a) \\
 \\
-alloc(\varsigma) &= \text{a new address} \\
+alloc &: \Sigma \rightarrow Addr \\
+alloc(\varsigma) &= \text{an unallocated address} \\
 \text{Our transition function is of type} \\
 (\Sigma \times \textsf{Store}) &\rightarrow (\Sigma \times \textsf{Store})
 \end{align*}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%
+%%% Begin Semantics
+%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{center}
 \begin{tabular}{l | r}
@@ -53,56 +74,105 @@ alloc(\varsigma) &= \text{a new address} \\
 where $\kappa = \sigma(a) , b = alloc(\varsigma) $} \\
 \multicolumn{2}{c}{proceed by matching on $\varsigma$} \\
 \hline
-$\langle x , \rho , a \rangle$ 
-& $\langle v , \rho' , a \rangle$ \\
-& where $(v , \rho') = \sigma(\rho(x))$ \\
+%%%%% VARLOOKUP EXP
+$\langle
+x , \rho , a
+\rangle$
+&$\langle
+v , \rho , a
+\rangle$ \\
+& where $v = \sigma(\rho(x))$ \\
 \hline
-$\langle x , \rho , a \rangle$ 
-& $\langle op , \rho , a \rangle$ \\
-& where $x \not\in \rho$ and $ op = \psi(x) $ \\
+%%%%% LAMBDA EXP
+$\langle
+\lamsyn{x}{e} , \rho , a
+\rangle$
+&$\langle
+\textbf{clo}(\lamsyn{x}{e}, \rho) , \rho , a 
+\rangle$ \\
 \hline
-$\langle (e_0 \; e_z ...) , \rho , a \rangle$ 
-& $\langle e_0 , \rho , b \rangle$ \\
-& $ \sigma = \sigma[b \longmapsto \textbf{appf}([\:], e_z , \rho , a)]$ \\
+%%%%% IF EXP
+$\langle
+\ifsyn{e_c}{e_t}{e_f} , \rho , a
+\rangle$
+&$\langle
+e_c , \rho , b 
+\rangle$ \\
+& $\sigma[b \mapsto \textbf{ifk}(e_t , e_f , \rho , a)]$ \\
 \hline
-$\langle (\text{if} \; e_c \; e_t \; e_f) , \rho , a \rangle$ 
-& $\langle e_c , \rho , b \rangle$ \\
-& $ \sigma = \sigma[b \longmapsto \textbf{iff}(e_t , e_f , \rho , a)] $ \\
+%%%%% LET EXP
+$\langle
+\letsyn{x}{e_x}{e_b} , \rho , a
+\rangle$
+&$\langle
+e_x , \rho , b
+\rangle$ \\
+& $\sigma[b \mapsto \textbf{letk}(x , e_b , \rho , a)]$ \\
 \hline
-$ \langle (\text{let} \;(x \;e_0)\; e_1) , \rho , a\rangle $
-& $ \langle e_0 , \rho , b \rangle $ \\
-& $ \sigma = \sigma[b \longmapsto \textbf{letf}(x , e_1 , \rho , a)] $ \\
+%%%%% PRIM EXP
+$\langle
+\primsyn{op}{e_0}{es} , \rho , a
+\rangle$
+&$\langle
+e_0 , \rho , b
+\rangle$ \\
+& $\sigma[b \mapsto \textbf{primk}(op , [] ,  es , \rho , a)]$ \\
+trick for 0 arg prims? \\
+What would I make ctrl? \\
+Also should I merge \\ primk and appk \\
+\hline
+%%%%% APPLICATION EXP
+$\langle
+(e_f \; es ...) , \rho , a
+\rangle$
+&$\langle
+e_f , \rho , b
+\rangle$ \\
+& $\sigma[b \mapsto \textbf{appk}([] , e_s , \rho , a)]$ \\
 \hline
 $\langle v , \rho , a \rangle$ & \\
 match on $\kappa$ below \\
 \hline
-\textbf{mt}
+%%%%% MT KONTINUATION
+$ \textbf{mt}$ 
 & $\varsigma$ \\
 \hline
-$\textbf{appf}((op :: (vs...) , [\:] , \rho' , c) $ 
-& $ \langle v' , \rho' , c \rangle $ \\ 
-& $ v' $ = $op$ applied to $(vs \mdoubleplus [v])$ \\
+%%%%% IF KONTINUATION FALSE
+$ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
+& $\langle e_f , \rho' , c \rangle$ \\
+where $v = \falsesyn$ & \\
 \hline
-$ \textbf{appf}((\lambda (xs ...) e) :: (vs...) , [\:] , \rho' , c) $
-& $ \langle e , \rho'[xs_0 \longmapsto b_0 ... xs_i \longmapsto b_i] , c \rangle $ \\
-& $ vs = vs \mdoubleplus [v]$\\
-& $\sigma = \sigma[b_0 \mapsto (vs_0, \rho) ... b_i \mapsto (vs_i, \rho)] $ \\
+%%%%% IF KONTINUATION TRUE
+$ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
+& $\langle e_t , \rho' , c \rangle$ \\
+where $v \not= \falsesyn$ & \\
 \hline
-$\textbf{appf}(dn , h::(t...) , \rho' , c) $
-& $ \langle h , \rho' , b \rangle $ \\
-& $ \sigma = \sigma[b \longmapsto \textbf{appf}(dn \mdoubleplus	 [v] , t , \rho' , c)] $ \\
+%%%%% LET KONTINUATION
+$ \textbf{letk}(x , e_b , \rho' , c) $ 
+& $\langle e_b , \rho'[x \mapsto b] , c \rangle$ \\
+& $ \sigma[b \mapsto v] $ \\
 \hline
-$\textbf{iff}(e_t , e_f , \rho' , c) $ 
-& $ \langle e_f , \rho' , c \rangle $ \\
-if $ v = \text{\#f} $ &  \\
+%%%%% PRIM KONTINUATION DONE
+$ \textbf{primk}(op , done ,  [\;] , \rho' , c) $ 
+& $\langle v' , \rho' , c \rangle$ \\
+& $ v' = op $ applied to $(done \mdoubleplus [v])$ \\
 \hline
-$\textbf{iff}(e_t , e_f , \rho' , c) $ 
-& $ \langle e_t , \rho' , c \rangle $ \\
-if $ v \neq \text{\#f} $ & \\
+%%%%% PRIM KONTINUATION MORE
+$ \textbf{primk}(op , done ,  (h::t) , \rho' , c) $ 
+& $\langle h , \rho' , b  \rangle$ \\
+& $ \sigma[b \mapsto \textbf{primk}(op , done \mdoubleplus [v] , t , \rho' , c )] $ \\
 \hline
-$\textbf{letf}(x, e, \rho', c) $
-& $ \langle e, \rho'[x \longmapsto b] , c \rangle $ \\
-& $ \sigma = \sigma[b \longmapsto (v, \rho)] $ \\
+%%%%% APP KONTINUATION DONE
+$ \textbf{appk}((\textbf{clo}(\lamsyn{xs}{e_b} , \rho'') :: vs), $
+& $\langle e_b , \rho''[xs_0 \mapsto b_0 ... xs_i \mapsto b_i] , c \rangle$ \\
+$\;\;\;\;\;\;\;\;\;\;  [\;] , \rho' , c) $
+& $ vs = vs \mdoubleplus [v] $ \\
+& $ \sigma[b_0 \mapsto vs_0 ... b_i \mapsto vs_i] $  \\
+\hline
+%%%%% APP KONTINUATION MORE
+$ \textbf{appk}(done, h::t , \rho' , c) $
+& $\langle h , \rho' , b \rangle$ \\
+& $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [v] , t , \rho' , c)] $ \\
 \hline
 \end{tabular}
 \end{center}
@@ -110,6 +180,19 @@ $\textbf{letf}(x, e, \rho', c) $
 
 
 
+
+
+
+
+
+
+
+
+\newpage
+
+
+
+\section{Formalization of an aCESK* machine with basic Scheme features.}
 
 
 

@@ -6,25 +6,25 @@
 ; it implements some basic scheme features like 'if', 'let',
 ; and multi argument functions. Also has numbers and booleans.
 
-(struct prim (op) #:transparent)
 (struct state (ctrl env nextkaddr) #:transparent)
 
-(struct iff (et ef env nextkaddr) #:transparent)
-(struct letf (x body env nexkaddr) #:transparent)
-(struct appf (done todo env nextkaddr) #:transparent)
+(struct closure (lambda env) #:transparent)
+(struct prim (op) #:transparent)
+
+(struct ifk (et ef env nextkaddr) #:transparent)
+(struct letk (x body env nexkaddr) #:transparent)
+(struct appk (done todo env nextkaddr) #:transparent)
+(struct primk (op done todo env nextkaddr) #:transparent)
+
+(define prims
+  (hash '+ (prim +)))
 
 (define (atomic? v)
   (match v
-    [(prim _) #t]
-    [`(λ (,_ ...) ,_) #t]
+    [(closure _ _) #t]
     [(? number?) #t]
     [(? boolean?) #t]
     [else #f]))
-
-(define prims
-  (hash
-   '+ (prim (λ vs (foldl (λ (x accum) (if (number? x) (+ x accum) (raise 'not-a-number))) 0 vs)))
-   'unsafe+ (prim +)))
 
 ; The state is unneeded for now, just need an unused address
 (define objcount 0)
@@ -46,58 +46,50 @@
   (set! store (make-hash (list (cons 'mt 'mt)))))
 
 (define (step-atomic st)
-  (match-define (state ctrl env kaddr) st)
-  (define k (get-from-store kaddr))
-  ; ctrl should be atomic here
-  (match k
+  (match-define (state ctrl env a) st)
+  (match (get-from-store a)
     ['mt st]
-    [(appf (cons (prim op) vs) '() envprime nextkaddr)
-     (define full-vs (append vs (list ctrl)))
-     (define result (apply op full-vs))
-     (state result envprime nextkaddr)]
-    [(appf (cons `(λ (,xs ...) ,body) vs) '() envprime nextkaddr)
-     (define bs (map (λ (v) (add-to-store! (cons v env) st)) (append vs (list ctrl))))
-     (define new-env-mappings (map cons xs bs))
-     (define new-env (hash-union envprime (make-immutable-hash new-env-mappings)))
-     (state body new-env nextkaddr)]
-    [(appf done (cons head rest) envprime nextkaddr)
-     (define nextk (appf (append done (list ctrl)) rest envprime nextkaddr))
-     (define b (add-to-store! nextk st))
-     (state head envprime b)]
-    [(iff et ef envprime nextkaddr)
+    [(ifk et ef envprime c)
      (if (equal? ctrl #f)
-         (state ef envprime nextkaddr)
-         (state et envprime nextkaddr))]
-    [(letf x body envprime nextkaddr)
-     (define b (add-to-store! (cons ctrl env) st))
-     (state body (hash-set envprime x b) nextkaddr)]))
+         (state ef envprime c)
+         (state et envprime c))]
+    [(letk x eb envprime c)
+     (define b (add-to-store! ctrl st))
+     (state eb (hash-set envprime x b) c)]
+    [(primk (prim op) done '() envprime c)
+     (state (apply op (append done (list ctrl))) envprime c)]
+    [(primk op done (cons h t) envprime c)
+     (define b (add-to-store! (primk op (append done (list ctrl)) t envprime c) st))
+     (state h envprime b)]
+    [(appk (cons (closure `(λ (,xs ...) ,eb) cloenv) vs) '() envprime c)
+     (define bs (map (λ (v) (add-to-store! v st)) (append vs (list ctrl))))
+     (define new-env-mappings (map cons xs bs))
+     (state eb (hash-union cloenv (make-immutable-hash new-env-mappings)) c)]
+    [(appk done (cons h t) envprime c)
+     (define b (add-to-store! (appk (append done (list ctrl)) t envprime c) st))
+     (state h envprime b)]))
 
 (define (step st)
-  (match-define (state ctrl env kaddr) st)
-  ;#;(displayln st) #;(displayln store) #;(newline)
+  (match-define (state ctrl env a) st)
   (match ctrl
     [(? atomic?) (step-atomic st)]
+    [`(λ (,xs ...) ,body)
+     (state (closure ctrl env) env a)]
     [`(if ,ec ,et ,ef)
-     (define nextk (iff et ef env kaddr))
-     (define b (add-to-store! nextk st))
+     (define b (add-to-store! (ifk et ef env a) st))
      (state ec env b)]
-    [`(let (,x ,e) ,body)
-     (define nextk (letf x body env kaddr))
-     (define b (add-to-store! nextk st))
-     (state e env b)]
+    [`(let (,x ,ex) ,eb)
+     (define b (add-to-store! (letk x eb env a) st))
+     (state ex env b)]
+    [`(prim ,op ,e0 ,es ...)
+     (define b (add-to-store! (primk (hash-ref prims op) '() es env a) st))
+     (state e0 env b)]
     [`(,ef ,es ...)
-     (define nextk (appf '() es env kaddr))
-     (define b (add-to-store! nextk st))
+     (define b (add-to-store! (appk '() es env a) st))
      (state ef env b)]
     [(? symbol?)
-     (define not-found (gensym))
-     (define addr (hash-ref env ctrl not-found))
-     (if (equal? addr not-found)
-         (if (hash-has-key? prims ctrl)
-             (state (hash-ref prims ctrl) env kaddr)
-             (raise `(variable-not-in-scope: ,ctrl)))
-         (match-let ([(cons v venv) (get-from-store (hash-ref env ctrl))])
-           (state v venv kaddr)))]))
+     (define v (get-from-store (hash-ref env ctrl)))
+     (state v env a)]))
 
 
 ; forms an initial state from an expression
