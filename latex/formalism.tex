@@ -17,6 +17,7 @@
 \setlength{\droptitle}{-10em}  % Make title not in middle of page (uses titling package)
 \def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;}
 \newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
+\newcommand\mae{\ensuremath{\text{\ae}}}
 \setcounter{section}{-1}
 \begin{document}
 
@@ -33,32 +34,37 @@
 
 \section{Formalization of a CESK* machine with basic Scheme features.}
 
+
 \begin{align*}
-\varsigma \in \Sigma &= \textsf{Exp} \times \textsf{Env} \times \textsf{Kont} \\
-op \in \textit{Primitive} &\;\;\;\;\;\; \text{The set of primitves} \\
-\mathit{clo} \in \mathit{Clo} &= \lamsyn{x}{e} \times \textsf{Env} \\
-\textsf{Bool} &::= \truesyn \;|\; \falsesyn \\
-v \in \textsf{AExp} &= \mathit{Clo} \;+\; \textsf{Bool} \;+\; \mathbb{Z} \\
-x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers} \\
-e \in \textsf{Exp} &::= x  \;|\; v \;|\; \lamsyn{x}{e} \\
+&\textbf{Syntax:} \\
+e \in \textsf{Exp} &::= x  \;|\; \mae \;|\; lam \\
 				  &	\;\;\;\;\;\;\;\;\; \;|\; \ifsyn{e}{e}{e}  \\
 				  &	\;\;\;\;\;\;\;\;\; \;|\; \letsyn{x}{e}{e} \\
 				  &	\;\;\;\;\;\;\;\;\; \;|\; \primsyn{op}{e}{e} \\
 				  &	\;\;\;\;\;\;\;\;\; \;|\; (e \; e \; ...) \\
-a,b,c \in \textit{Addr} &\;\;\;\;\;\; \text{A set of addresses} \\
-\rho \in \textsf{Env} &= \textsf{Var} \rightharpoonup \textit{Addr} \\
-\sigma \in \textsf{Store} &= \textit{Addr} \rightharpoonup \textsf{AExp} \\
-done &= \textsf{Val*} \\
+\mae \in \textsf{AExp} &= \mathit{Clo} \;+\; \textsf{Bool} \;+\; \mathbb{Z} \\
+ \text{This doesnt feel right} &\Uparrow\; \text{Because Clo cant be constructed syntactically...} \\
+lam \in \textsf{Lam} &::= \lamsyn{x}{e} \\
+x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers} \\
+\textsf{Bool} &::= \truesyn \;|\; \falsesyn \\
+done &= \textsf{AExp*} \\
 todo &= \textsf{Exp*} \\
-\kappa \in \textsf{Kont} &= \textbf{mt} \;|\; \textbf{appk}(done, todo, \rho, a) \\
+&\textbf{Semantics:} \\
+\varsigma \in \Sigma &= \textsf{Exp} \times \textsf{Env} \times \textsf{Kont} \\
+op \in \textit{Primitive} &\;\;\;\;\;\; \text{The set of primitves} \\
+\mathit{clo} \in \mathit{Clo} &= lam \times \textsf{Env} \\
+\rho \in \textit{Env} &= \textsf{Var} \rightharpoonup \textit{Addr} \\
+\sigma \in \textsf{Store} &= \textit{Addr} \rightharpoonup \textsf{AExp} \\
+\kappa \in \textit{Kont} &= \textbf{mt} \;|\; \textbf{appk}(done, todo, \rho, a) \\
 					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{ifk}(e, e, \rho, a) \\
 					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{letk}(x, e, \rho, a) \\
 \\
 alloc &: \Sigma \rightarrow Addr \\
 alloc(\varsigma) &= \text{an unallocated address} \\
-\text{Our transition function is of type} \\
-(\Sigma \times \textsf{Store}) &\rightarrow (\Sigma \times \textsf{Store})
+\textbf{Transition}&\textbf{ Function:} \\
+(\Sigma \times \textsf{Store}) &\rightarrow (\Sigma \times \textsf{Store}) \\
 \end{align*}
+
 
 \newpage
 
@@ -69,7 +75,7 @@ alloc(\varsigma) &= \text{an unallocated address} \\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{center}
-\begin{tabular}{l | r}
+\begin{tabular}{@{}l | r@{}}
 \multicolumn{2}{c}{$(\varsigma \times \sigma) \rightarrow (\varsigma' \times \sigma)$, 
 where $\kappa = \sigma(a) , b = alloc(\varsigma) $} \\
 \multicolumn{2}{c}{proceed by matching on $\varsigma$} \\
@@ -79,16 +85,16 @@ $\langle
 x , \rho , a
 \rangle$
 &$\langle
-v , \rho , a
+\mae , \rho , a
 \rangle$ \\
-& where $v = \sigma(\rho(x))$ \\
+& where $\mae = \sigma(\rho(x))$ \\
 \hline
 %%%%% LAMBDA EXP
 $\langle
-\lamsyn{x}{e} , \rho , a
+lam , \rho , a
 \rangle$
 &$\langle
-\textbf{clo}(\lamsyn{x}{e}, \rho) , \rho , a 
+\textbf{clo}(lam, \rho) , \rho , a 
 \rangle$ \\
 \hline
 %%%%% IF EXP
@@ -116,10 +122,7 @@ $\langle
 &$\langle
 e_0 , \rho , b
 \rangle$ \\
-& $\sigma[b \mapsto \textbf{primk}(op , [] ,  es , \rho , a)]$ \\
-trick for 0 arg prims? \\
-What would I make ctrl? \\
-Also should I merge \\ primk and appk \\
+& $\sigma[b \mapsto \textbf{appk}([op] ,  es , \rho , a)]$ \\
 \hline
 %%%%% APPLICATION EXP
 $\langle
@@ -130,57 +133,47 @@ e_f , \rho , b
 \rangle$ \\
 & $\sigma[b \mapsto \textbf{appk}([] , e_s , \rho , a)]$ \\
 \hline
-$\langle v , \rho , a \rangle$ & \\
+$\langle \mae , \rho , a \rangle$ & \\
 match on $\kappa$ below \\
 \hline
 %%%%% MT KONTINUATION
 $ \textbf{mt}$ 
-& $\varsigma$ \\
+& $\langle \mae , \rho , a \rangle$ \\
 \hline
 %%%%% IF KONTINUATION FALSE
 $ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
 & $\langle e_f , \rho' , c \rangle$ \\
-where $v = \falsesyn$ & \\
+where $\mae = \falsesyn$ & \\
 \hline
 %%%%% IF KONTINUATION TRUE
 $ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
 & $\langle e_t , \rho' , c \rangle$ \\
-where $v \not= \falsesyn$ & \\
+where $\mae \not= \falsesyn$ & \\
 \hline
 %%%%% LET KONTINUATION
-$ \textbf{letk}(x , e_b , \rho' , c) $ 
+$ \textbf{letk}(x , e_b , \rho' , c) $
 & $\langle e_b , \rho'[x \mapsto b] , c \rangle$ \\
 & $ \sigma[b \mapsto v] $ \\
 \hline
-%%%%% PRIM KONTINUATION DONE
-$ \textbf{primk}(op , done ,  [\;] , \rho' , c) $ 
-& $\langle v' , \rho' , c \rangle$ \\
-& $ v' = op $ applied to $(done \mdoubleplus [v])$ \\
+%%%%% APP KONTINUATION DONE PRIM
+$ \textbf{appk}(op :: \mae_s , [] , \rho' , c) $
+& $\langle \mae' , \rho' , c \rangle$ \\
+& $ \mae' = op $ applied to $(\mae_s \mdoubleplus [\mae])$ \\
 \hline
-%%%%% PRIM KONTINUATION MORE
-$ \textbf{primk}(op , done ,  (h::t) , \rho' , c) $ 
-& $\langle h , \rho' , b  \rangle$ \\
-& $ \sigma[b \mapsto \textbf{primk}(op , done \mdoubleplus [v] , t , \rho' , c )] $ \\
-\hline
-%%%%% APP KONTINUATION DONE
-$ \textbf{appk}((\textbf{clo}(\lamsyn{xs}{e_b} , \rho'') :: vs), $
+%%%%% APP KONTINUATION DONE CLO
+$ \textbf{appk}((\textbf{clo}(\lamsyn{xs}{e_b} , \rho'') :: \mae_s), $
 & $\langle e_b , \rho''[xs_0 \mapsto b_0 ... xs_i \mapsto b_i] , c \rangle$ \\
 $\;\;\;\;\;\;\;\;\;\;  [\;] , \rho' , c) $
-& $ vs = vs \mdoubleplus [v] $ \\
-& $ \sigma[b_0 \mapsto vs_0 ... b_i \mapsto vs_i] $  \\
+& $ \mae_s = \mae_s \mdoubleplus [\mae] $ \\
+& $ \sigma[b_0 \mapsto \mae_{s0} ... b_i \mapsto \mae_{si}] $  \\
 \hline
 %%%%% APP KONTINUATION MORE
-$ \textbf{appk}(done, h::t , \rho' , c) $
-& $\langle h , \rho' , b \rangle$ \\
-& $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [v] , t , \rho' , c)] $ \\
+$ \textbf{appk}(done, e_h::e_t , \rho' , c) $
+& $\langle e_h , \rho' , b \rangle$ \\
+& $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [\mae] , e_t , \rho' , c)] $ \\
 \hline
 \end{tabular}
 \end{center}
-
-
-
-
-
 
 
 
@@ -192,7 +185,9 @@ $ \textbf{appk}(done, h::t , \rho' , c) $
 
 
 
-\section{Formalization of an aCESK* machine with basic Scheme features.}
+\section{Formalization of an Abstract CESK* machine with basic Scheme features.}
+
+
 
 
 

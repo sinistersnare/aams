@@ -14,7 +14,6 @@
 (struct ifk (et ef env nextkaddr) #:transparent)
 (struct letk (x body env nexkaddr) #:transparent)
 (struct appk (done todo env nextkaddr) #:transparent)
-(struct primk (op done todo env nextkaddr) #:transparent)
 
 (define prims
   (hash '+ (prim +)))
@@ -56,11 +55,8 @@
     [(letk x eb envprime c)
      (define b (add-to-store! ctrl st))
      (state eb (hash-set envprime x b) c)]
-    [(primk (prim op) done '() envprime c)
-     (state (apply op (append done (list ctrl))) envprime c)]
-    [(primk op done (cons h t) envprime c)
-     (define b (add-to-store! (primk op (append done (list ctrl)) t envprime c) st))
-     (state h envprime b)]
+    [(appk (cons (prim op) vs) '() envprime c)
+     (state (apply op (append vs (list ctrl))) envprime c)]
     [(appk (cons (closure `(λ (,xs ...) ,eb) cloenv) vs) '() envprime c)
      (define bs (map (λ (v) (add-to-store! v st)) (append vs (list ctrl))))
      (define new-env-mappings (map cons xs bs))
@@ -71,6 +67,7 @@
 
 (define (step st)
   (match-define (state ctrl env a) st)
+  ; (displayln `(st: ,st))
   (match ctrl
     [(? atomic?) (step-atomic st)]
     [`(λ (,xs ...) ,body)
@@ -82,7 +79,7 @@
      (define b (add-to-store! (letk x eb env a) st))
      (state ex env b)]
     [`(prim ,op ,e0 ,es ...)
-     (define b (add-to-store! (primk (hash-ref prims op) '() es env a) st))
+     (define b (add-to-store! (appk (list (hash-ref prims op)) es env a) st))
      (state e0 env b)]
     [`(,ef ,es ...)
      (define b (add-to-store! (appk '() es env a) st))
