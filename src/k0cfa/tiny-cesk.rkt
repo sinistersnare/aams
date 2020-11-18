@@ -14,12 +14,18 @@
 (struct ifk (et ef env nextkaddr) #:transparent)
 (struct letk (x body env nexkaddr) #:transparent)
 (struct appk (done todo env nextkaddr) #:transparent)
+(struct mtk () #:transparent)
 
 (define prims
   (hash '+ (prim +)
         'equal? (prim equal?)
         'number? (prim number?)
         'boolean? (prim boolean?)))
+
+(define (continuation? v)
+  (match v
+    [(or (? ifk?) (? letk?) (? appk?) (? mtk?)) #t]
+    [else #f]))
 
 (define (lambda? e)
   (match e
@@ -43,7 +49,7 @@
   addr)
 
 ; global store, default value contains the mt kont.
-(define store (make-hash (list (cons 'mt 'mt))))
+(define store (make-hash (list (cons 'mt (mtk)))))
 ; adds a value to the store, returns the address of that value.
 (define (add-to-store! v st)
   (define addr (alloc st))
@@ -52,7 +58,7 @@
 (define (get-from-store addr)
   (hash-ref store addr))
 (define (reset-store!)
-  (set! store (make-hash (list (cons 'mt 'mt)))))
+  (set! store (make-hash (list (cons 'mt (mtk))))))
 
 (define (atomic-eval st)
   (match-define (state ctrl env kont) st)
@@ -69,7 +75,7 @@
   (define v (atomic-eval st))
   (define k (get-from-store a))
   (match k
-    ['mt st]
+    [(mtk) st]
     [(ifk et ef envprime c) #:when (equal? v #f)
                             (state ef envprime c)]
     [(ifk et ef envprime c) #:when (not (equal? v #f))
@@ -88,13 +94,22 @@
      (define bs (map (λ (v) (add-to-store! v st)) vs))
      (define new-bindings (make-immutable-hash (map cons xs bs)))
      (define extended-lamenv (hash-union lamenv new-bindings #:combine (λ (a b) b)))
-     (state eb extended-lamenv c)]))
+     (state eb extended-lamenv c)]
+    [(appk (list 'call/cc) '() envprime c)
+     (match-define (closure `(λ (,kvar) ,ebody) cloenv) v)
+     (state ebody (hash-set cloenv kvar c) c)]
+    [(appk (list (? continuation? retk)) '() envprime c)
+     (define b (add-to-store! retk st))
+     (state v envprime b)]))
 
 (define (step st)
   (match-define (state ctrl env a) st)
-  #;(displayln `(st ,store))
+  #;(displayln `(,st ,store))
   (match ctrl
     [(? atomic? ctrl) (step-atomic st)]
+    [`(call/cc ,e)
+     (define b (add-to-store! (appk (list 'call/cc) '() env a) st))
+     (state e env b)]
     [`(if ,ec ,et ,ef)
      (define b (add-to-store! (ifk et ef env a) st))
      (state ec env b)]
@@ -115,7 +130,7 @@
 (define (fix? st0 st1)
   (match-define (state c0 _ k0) st0)
   (match-define (state c1 _ k1) st1)
-  (and (eq? k0 'mt) (eq? k1 'mt) (eq? c0 c1)))
+  (eq? st0 st1))
 
 ; iterates an initial state until fixpoint
 (define (evaluate prog)

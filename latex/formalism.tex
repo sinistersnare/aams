@@ -22,9 +22,11 @@
 \newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
 \newcommand\mae{\ensuremath{\text{\ae}}}
 \newcommand{\lamsyn}[2]{(\lambda\;(#1 ...)\;#2)}
+\newcommand{\singlelamsyn}[2]{(\lambda\;(#1)\;#2)}
 \newcommand{\letsyn}[3]{(\texttt{let}\;(#1\;#2)\;#3)}
 \newcommand{\ifsyn}[3]{(\texttt{if}\;#1\;#2\;#3)}
 \newcommand{\primsyn}[3]{(\texttt{prim}\;#1\;#2\;#3 ...)}
+\newcommand{\callccsyn}[1]{(\texttt{call/cc\;#1})}
 \newcommand{\truesyn}{\texttt{\#t}}
 \newcommand{\falsesyn}{\texttt{\#f}}
 
@@ -33,7 +35,6 @@
 
 \section{Concrete Semantics of Scheme CESK*}
 
-
 \begin{center}
 \textbf{Syntax:}
 \end{center}
@@ -41,10 +42,11 @@
 \begin{align*}
 %%% Expressions
 e \in \textsf{Exp} &::= \mae \\
-				  &	\;\;\;\;\; \;|\; \ifsyn{e}{e}{e}  \\
-				  &	\;\;\;\;\; \;|\; \letsyn{x}{e}{e} \\
-				  &	\;\;\;\;\; \;|\; \primsyn{op}{e}{e} \\
-				  &	\;\;\;\;\; \;|\; (e \; e \; ...) \\
+				  & \;\;\;\;\; \;|\; \ifsyn{e}{e}{e}  \\
+				  & \;\;\;\;\; \;|\; \letsyn{x}{e}{e} \\
+				  & \;\;\;\;\; \;|\; \primsyn{op}{e}{e} \\
+				  & \;\;\;\;\; \;|\; \callccsyn{e} \\
+				  & \;\;\;\;\; \;|\; (e \; e \; ...) \\
 %%% Atomic Expressions
 \mae \in \textsf{AExp} &::= lam \;|\; \mathbb{Z} \;|\; \truesyn \;|\; \falsesyn \\
 %%% Lambdas
@@ -65,7 +67,7 @@ x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers}
 %%% Store
 \sigma \in \textit{Store} &\triangleq \textit{Addr} \rightharpoonup \textit{Val} \\
 %%% Values
-v \in \textit{Val} &\triangleq \textit{Clo} + \mathbb{Z} + \{\truesyn, \falsesyn\} \\
+v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} + \mathbb{Z} + \{\truesyn, \falsesyn\} \\
 %%% Closures
 clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
 %%% Kontinuations
@@ -139,6 +141,15 @@ e_0 , \rho , b
 \rangle$ \\
 & $\sigma[b \mapsto \textbf{appk}([op] ,  es , \rho , a)]$ \\
 \hline
+%%%%% CALL/CC EXP
+$\langle
+\callccsyn{e} , \rho , a
+\rangle$
+&$\langle
+e , \rho , b
+\rangle$ \\
+&$\sigma[b \mapsto \textbf{appk}([\textbf{call/cc}] , [\;] , \rho , a)]$ \\
+\hline
 %%%%% APPLICATION EXP
 $\langle
 (e_f \; es ...) , \rho , a
@@ -186,6 +197,20 @@ $ \textbf{appk}(clo :: v_s, [\;] , \rho' , c) $
 & $\langle e_b , \rho_{\lambda}[x_{s0} \mapsto b_0 ... x_{si} \mapsto b_i] , c \rangle$ \\
 where $ clo = (\lamsyn{x_s}{e_b} , \rho_{\lambda}) $ & $ v'_s = v_s \mdoubleplus [v] $ \\
 & $ \sigma[b_0 \mapsto v'_{s0} ... b_i \mapsto v'_{si}] $  \\
+\hline
+%%%%% CALL/CC CALL
+$\textbf{appk}([\textbf{call/cc}] , [\;] , \rho' , c)$
+&$\langle
+e , \rho_{\lambda}[x \mapsto c] , c
+\rangle$ \\
+where $v = (\singlelamsyn{x}{e} , \rho_{\lambda})$\\
+\hline
+%%%%% CALL/CC USE KONT
+$\textbf{appk}([\kappa_v] , [\;] , \rho' , c)$
+&$\langle
+v , \rho' , b
+\rangle$\\
+&$\sigma[b \mapsto \kappa_v]$ \\
 \hline
 \end{tabular}
 \end{center}
