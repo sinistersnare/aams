@@ -8,7 +8,7 @@
 
 (struct state (ctrl env nextkaddr) #:transparent)
 
-(struct closure (lambda env) #:transparent)
+(struct closure (lam env) #:transparent)
 (struct prim (op) #:transparent)
 
 (struct ifk (et ef env nextkaddr) #:transparent)
@@ -16,7 +16,10 @@
 (struct appk (done todo env nextkaddr) #:transparent)
 
 (define prims
-  (hash '+ (prim +)))
+  (hash '+ (prim +)
+        'equal? (prim equal?)
+        'number? (prim number?)
+        'boolean? (prim boolean?)))
 
 (define (lambda? e)
   (match e
@@ -28,10 +31,8 @@
 ; checks a syntactic expression to see if its an atomically evaluable expression
 (define (atomic? v)
   (match v
-    [(? symbol?) #t]
-    [(? lambda?) #t]
-    [(? number?) #t]
-    [(? boolean?) #t]
+    [(or (? symbol?) (? lambda?)
+         (? number?) (? boolean?)) #t]
     [else #f]))
 
 ; The state is unneeded for now, just need an unused address
@@ -122,7 +123,7 @@
   (define state0 (inject prog))
   (define (run st)
     (define nextst (step st))
-    (if (fix? nextst st) (atomic-eval st) (run nextst)))
+    (if (fix? nextst st) (cons (atomic-eval st) st) (run nextst)))
   (run state0))
 
 (define e evaluate)

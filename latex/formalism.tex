@@ -12,15 +12,15 @@
 \usepackage{amsthm}
 \usepackage{tikz}
 \usepackage{titling}
-%\usepackage{bm}
 
 \setlength{\droptitle}{-10em}  % Make title not in middle of page (uses titling package)
 \def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;}
-\newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
-\newcommand\mae{\ensuremath{\text{\ae}}}
+
 % \setcounter{section}{-1} % sets the first section number to 0
 \begin{document}
 
+\newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
+\newcommand\mae{\ensuremath{\text{\ae}}}
 \newcommand{\lamsyn}[2]{(\lambda\;(#1 ...)\;#2)}
 \newcommand{\letsyn}[3]{(\texttt{let}\;(#1\;#2)\;#3)}
 \newcommand{\ifsyn}[3]{(\texttt{if}\;#1\;#2\;#3)}
@@ -31,7 +31,7 @@
 % textsf for syntactic domains
 % textit for semantic domains
 
-\section{Semantics of Basic Scheme CESK*}
+\section{Concrete Semantics of Scheme CESK*}
 
 
 \begin{center}
@@ -108,7 +108,7 @@ done \triangleq \textit{Val}* \;\;&\;\; todo \triangleq \textsf{Exp}*
 
 \begin{center}
 \begin{tabular}{@{}l | r@{}}
-\multicolumn{2}{c}{$(\varsigma \times \sigma) \rightarrow (\varsigma' \times \sigma)$, 
+\multicolumn{2}{c}{$(\varsigma \times \sigma) \leadsto (\varsigma' \times \sigma)$, 
 where $\kappa = \sigma(a) , b = alloc(\varsigma) $} \\
 \multicolumn{2}{c}{proceed by matching on $\varsigma$} \\
 \hline\hline
@@ -177,14 +177,14 @@ $ \textbf{appk}(done, e_h::e_t , \rho' , c) $
 & $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [v] , e_t , \rho' , c)] $ \\
 \hline
 %%%%% APP KONTINUATION DONE PRIM
-$ \textbf{appk}(op :: v_s , [] , \rho' , c) $
+$ \textbf{appk}(op :: v_s , [\;] , \rho' , c) $
 & $\langle v' , \rho' , c \rangle$ \\
 & $ v' = op $ applied to $(v_s \mdoubleplus [v])$ \\
 \hline
 %%%%% APP KONTINUATION DONE CLO
 $ \textbf{appk}(clo :: v_s, [\;] , \rho' , c) $
-& $\langle e_b , \rho_{\lambda}[xs_0 \mapsto b_0 ... xs_i \mapsto b_i] , c \rangle$ \\
-where $ clo = (\lamsyn{xs}{e_b} , \rho_{\lambda}) $ & $ v'_s = v_s \mdoubleplus [v] $ \\
+& $\langle e_b , \rho_{\lambda}[x_{s0} \mapsto b_0 ... x_{si} \mapsto b_i] , c \rangle$ \\
+where $ clo = (\lamsyn{x_s}{e_b} , \rho_{\lambda}) $ & $ v'_s = v_s \mdoubleplus [v] $ \\
 & $ \sigma[b_0 \mapsto v'_{s0} ... b_i \mapsto v'_{si}] $  \\
 \hline
 \end{tabular}
@@ -192,7 +192,7 @@ where $ clo = (\lamsyn{xs}{e_b} , \rho_{\lambda}) $ & $ v'_s = v_s \mdoubleplus 
 
 \newpage
 
-\section{Formalization of an Abstract CESK* machine with basic Scheme features.}
+\section{Abstract Semantics of Scheme CESK*}
 
 
 
