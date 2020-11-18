@@ -18,9 +18,18 @@
 (define prims
   (hash '+ (prim +)))
 
+(define (lambda? e)
+  (match e
+    ; only standard multiarg lambda for now
+    [`(λ (,_ ...) ,_) #t] ; standard multiarg lambda
+    [`(λ ,(? symbol?) ,_) #f] ; dont allow varag lambda
+    [else #f]))
+
+; checks a syntactic expression to see if its an atomically evaluable expression
 (define (atomic? v)
   (match v
-    [(closure _ _) #t]
+    [(? symbol?) #t]
+    [(? lambda?) #t]
     [(? number?) #t]
     [(? boolean?) #t]
     [else #f]))
@@ -44,49 +53,59 @@
 (define (reset-store!)
   (set! store (make-hash (list (cons 'mt 'mt)))))
 
+(define (atomic-eval st)
+  (match-define (state ctrl env kont) st)
+  (match ctrl
+    ; wrap lambdas into a closure
+    [(? lambda?) (closure ctrl env)]
+    ; no evaluation needed for these
+    [(or (? boolean?) (? number?)) ctrl] 
+    ; lookup symbol to evaluate
+    [(? symbol?) (get-from-store (hash-ref env ctrl))]))
+
 (define (step-atomic st)
   (match-define (state ctrl env a) st)
-  (match (get-from-store a)
+  (define v (atomic-eval st))
+  (define k (get-from-store a))
+  (match k
     ['mt st]
-    [(ifk et ef envprime c)
-     (if (equal? ctrl #f)
-         (state ef envprime c)
-         (state et envprime c))]
+    [(ifk et ef envprime c) #:when (equal? v #f)
+                            (state ef envprime c)]
+    [(ifk et ef envprime c) #:when (not (equal? v #f))
+                            (state et envprime c)]
     [(letk x eb envprime c)
-     (define b (add-to-store! ctrl st))
+     (define b (add-to-store! v st))
      (state eb (hash-set envprime x b) c)]
+    [(appk done (cons eh et) envprime c)
+     (define b (add-to-store! (appk (append done (list v)) et envprime c) st))
+     (state eh envprime b)]
     [(appk (cons (prim op) vs) '() envprime c)
-     (state (apply op (append vs (list ctrl))) envprime c)]
-    [(appk (cons (closure `(λ (,xs ...) ,eb) cloenv) vs) '() envprime c)
-     (define bs (map (λ (v) (add-to-store! v st)) (append vs (list ctrl))))
-     (define new-env-mappings (map cons xs bs))
-     (state eb (hash-union cloenv (make-immutable-hash new-env-mappings)) c)]
-    [(appk done (cons h t) envprime c)
-     (define b (add-to-store! (appk (append done (list ctrl)) t envprime c) st))
-     (state h envprime b)]))
+     (define vprime (apply op (append vs (list v))))
+     (state vprime envprime c)]
+    [(appk (cons (closure `(λ (,xs ...) ,eb) lamenv) incomplete-vs) '() envprime c)
+     (define vs (append incomplete-vs (list v)))
+     (define bs (map (λ (v) (add-to-store! v st)) vs))
+     (define new-bindings (make-immutable-hash (map cons xs bs)))
+     (define extended-lamenv (hash-union lamenv new-bindings #:combine (λ (a b) b)))
+     (state eb extended-lamenv c)]))
 
 (define (step st)
   (match-define (state ctrl env a) st)
-  ; (displayln `(st: ,st))
+  #;(displayln `(st ,store))
   (match ctrl
-    [(? atomic?) (step-atomic st)]
-    [`(λ (,xs ...) ,body)
-     (state (closure ctrl env) env a)]
+    [(? atomic? ctrl) (step-atomic st)]
     [`(if ,ec ,et ,ef)
      (define b (add-to-store! (ifk et ef env a) st))
      (state ec env b)]
-    [`(let (,x ,ex) ,eb)
-     (define b (add-to-store! (letk x eb env a) st))
+    [`(let (,x ,ex) ,ebody)
+     (define b (add-to-store! (letk x ebody env a) st))
      (state ex env b)]
     [`(prim ,op ,e0 ,es ...)
      (define b (add-to-store! (appk (list (hash-ref prims op)) es env a) st))
      (state e0 env b)]
     [`(,ef ,es ...)
      (define b (add-to-store! (appk '() es env a) st))
-     (state ef env b)]
-    [(? symbol?)
-     (define v (get-from-store (hash-ref env ctrl)))
-     (state v env a)]))
+     (state ef env b)]))
 
 
 ; forms an initial state from an expression
@@ -103,13 +122,10 @@
   (define state0 (inject prog))
   (define (run st)
     (define nextst (step st))
-    (if (fix? nextst st) st (run nextst)))
+    (if (fix? nextst st) (atomic-eval st) (run nextst)))
   (run state0))
 
 (define e evaluate)
-
-
-
 
 
 

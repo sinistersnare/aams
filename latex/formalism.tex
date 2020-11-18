@@ -18,7 +18,7 @@
 \def\checkmark{\tikz\fill[scale=0.4](0,.35) -- (.25,0) -- (1,.7) -- (.25,.15) -- cycle;}
 \newcommand\mdoubleplus{\ensuremath{\mathbin{+\mkern-9mu+}}}
 \newcommand\mae{\ensuremath{\text{\ae}}}
-\setcounter{section}{-1}
+% \setcounter{section}{-1} % sets the first section number to 0
 \begin{document}
 
 \newcommand{\lamsyn}[2]{(\lambda\;(#1 ...)\;#2)}
@@ -28,45 +28,77 @@
 \newcommand{\truesyn}{\texttt{\#t}}
 \newcommand{\falsesyn}{\texttt{\#f}}
 
-% textit for semantic domains
 % textsf for syntactic domains
+% textit for semantic domains
+
+\section{Semantics of Basic Scheme CESK*}
 
 
-\section{Formalization of a CESK* machine with basic Scheme features.}
-
-
+\begin{center}
+\textbf{Syntax:}
+\end{center}
+\vspace{-7mm}
 \begin{align*}
-&\textbf{Syntax:} \\
-e \in \textsf{Exp} &::= x  \;|\; \mae \;|\; lam \\
-				  &	\;\;\;\;\;\;\;\;\; \;|\; \ifsyn{e}{e}{e}  \\
-				  &	\;\;\;\;\;\;\;\;\; \;|\; \letsyn{x}{e}{e} \\
-				  &	\;\;\;\;\;\;\;\;\; \;|\; \primsyn{op}{e}{e} \\
-				  &	\;\;\;\;\;\;\;\;\; \;|\; (e \; e \; ...) \\
-\mae \in \textsf{AExp} &= \mathit{Clo} \;+\; \textsf{Bool} \;+\; \mathbb{Z} \\
- \text{This doesnt feel right} &\Uparrow\; \text{Because Clo cant be constructed syntactically...} \\
+%%% Expressions
+e \in \textsf{Exp} &::= \mae \\
+				  &	\;\;\;\;\; \;|\; \ifsyn{e}{e}{e}  \\
+				  &	\;\;\;\;\; \;|\; \letsyn{x}{e}{e} \\
+				  &	\;\;\;\;\; \;|\; \primsyn{op}{e}{e} \\
+				  &	\;\;\;\;\; \;|\; (e \; e \; ...) \\
+%%% Atomic Expressions
+\mae \in \textsf{AExp} &::= lam \;|\; \mathbb{Z} \;|\; \truesyn \;|\; \falsesyn \\
+%%% Lambdas
 lam \in \textsf{Lam} &::= \lamsyn{x}{e} \\
-x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers} \\
-\textsf{Bool} &::= \truesyn \;|\; \falsesyn \\
-done &= \textsf{AExp*} \\
-todo &= \textsf{Exp*} \\
-&\textbf{Semantics:} \\
-\varsigma \in \Sigma &= \textsf{Exp} \times \textsf{Env} \times \textsf{Kont} \\
-op \in \textit{Primitive} &\;\;\;\;\;\; \text{The set of primitves} \\
-\mathit{clo} \in \mathit{Clo} &= lam \times \textsf{Env} \\
-\rho \in \textit{Env} &= \textsf{Var} \rightharpoonup \textit{Addr} \\
-\sigma \in \textsf{Store} &= \textit{Addr} \rightharpoonup \textsf{AExp} \\
-\kappa \in \textit{Kont} &= \textbf{mt} \;|\; \textbf{appk}(done, todo, \rho, a) \\
+%%% Variables
+x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers}
+\end{align*}
+\vspace{-10mm}
+\begin{center}
+\textbf{Semantics:}
+\end{center}
+\vspace{-7mm}
+\begin{align*}
+%%% State
+\varsigma \in \Sigma &\triangleq \textsf{Exp} \times \textit{Env} \times \textit{Kont} \\
+%%% Environment
+\rho \in \textit{Env} &\triangleq \textsf{Var} \rightharpoonup \textit{Addr} \\
+%%% Store
+\sigma \in \textit{Store} &\triangleq \textit{Addr} \rightharpoonup \textit{Val} \\
+%%% Values
+v \in \textit{Val} &\triangleq \textit{Clo} + \mathbb{Z} + \{\truesyn, \falsesyn\} \\
+%%% Closures
+clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
+%%% Kontinuations
+\kappa \in \textit{Kont} &\triangleq \textbf{mt} \;|\; \textbf{appk}(done, todo, \rho, a) \\
 					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{ifk}(e, e, \rho, a) \\
 					   &	\;\;\;\;\;\;\;\;\;\; \;|\; \textbf{letk}(x, e, \rho, a) \\
-\\
-alloc &: \Sigma \rightarrow Addr \\
-alloc(\varsigma) &= \text{an unallocated address} \\
-\textbf{Transition}&\textbf{ Function:} \\
-(\Sigma \times \textsf{Store}) &\rightarrow (\Sigma \times \textsf{Store}) \\
+%%% Addresses
+a,b,c \in \textit{Addr} &\;\;\;\;\; \text{A set of addreses} \\
+%%% done/todo variables
+done \triangleq \textit{Val}* \;\;&\;\; todo \triangleq \textsf{Exp}*
+\end{align*}
+\vspace{-10mm}
+\begin{center}
+\textbf{Atomic Evaluation Function:}
+\end{center}
+\vspace{-7mm}
+\begin{align*}
+\mathcal{A}(x, \rho, \sigma) &\triangleq \sigma(\rho(x)) \\
+\mathcal{A}(lam, \rho, \sigma) &\triangleq (lam , \rho) \\
+\mathcal{A}(\mae, \rho, \sigma) &\triangleq \mae
+\end{align*}
+\vspace{-10mm}
+\begin{center}
+\textbf{Transition Function:}
+\end{center}
+\vspace{-7mm}
+\begin{align*}
+(\Sigma \times \textit{Store}) \leadsto (\Sigma \times \textit{Store})
 \end{align*}
 
-
 \newpage
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%
@@ -79,24 +111,7 @@ alloc(\varsigma) &= \text{an unallocated address} \\
 \multicolumn{2}{c}{$(\varsigma \times \sigma) \rightarrow (\varsigma' \times \sigma)$, 
 where $\kappa = \sigma(a) , b = alloc(\varsigma) $} \\
 \multicolumn{2}{c}{proceed by matching on $\varsigma$} \\
-\hline
-%%%%% VARLOOKUP EXP
-$\langle
-x , \rho , a
-\rangle$
-&$\langle
-\mae , \rho , a
-\rangle$ \\
-& where $\mae = \sigma(\rho(x))$ \\
-\hline
-%%%%% LAMBDA EXP
-$\langle
-lam , \rho , a
-\rangle$
-&$\langle
-\textbf{clo}(lam, \rho) , \rho , a 
-\rangle$ \\
-\hline
+\hline\hline
 %%%%% IF EXP
 $\langle
 \ifsyn{e_c}{e_t}{e_f} , \rho , a
@@ -133,57 +148,49 @@ e_f , \rho , b
 \rangle$ \\
 & $\sigma[b \mapsto \textbf{appk}([] , e_s , \rho , a)]$ \\
 \hline
+%%%%% ATOMIC EXP -- TIME TO MATCH ON K
 $\langle \mae , \rho , a \rangle$ & \\
+let $v = \mathcal{A}(\mae, \rho, \sigma)$ \\
 match on $\kappa$ below \\
 \hline
 %%%%% MT KONTINUATION
-$ \textbf{mt}$ 
-& $\langle \mae , \rho , a \rangle$ \\
+$ \textbf{mt}$ & $\varsigma$ \\
 \hline
 %%%%% IF KONTINUATION FALSE
 $ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
 & $\langle e_f , \rho' , c \rangle$ \\
-where $\mae = \falsesyn$ & \\
+when $v = \falsesyn$ & \\
 \hline
 %%%%% IF KONTINUATION TRUE
 $ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
 & $\langle e_t , \rho' , c \rangle$ \\
-where $\mae \not= \falsesyn$ & \\
+when $v \not= \falsesyn$ & \\
 \hline
 %%%%% LET KONTINUATION
 $ \textbf{letk}(x , e_b , \rho' , c) $
 & $\langle e_b , \rho'[x \mapsto b] , c \rangle$ \\
 & $ \sigma[b \mapsto v] $ \\
 \hline
-%%%%% APP KONTINUATION DONE PRIM
-$ \textbf{appk}(op :: \mae_s , [] , \rho' , c) $
-& $\langle \mae' , \rho' , c \rangle$ \\
-& $ \mae' = op $ applied to $(\mae_s \mdoubleplus [\mae])$ \\
-\hline
-%%%%% APP KONTINUATION DONE CLO
-$ \textbf{appk}((\textbf{clo}(\lamsyn{xs}{e_b} , \rho'') :: \mae_s), $
-& $\langle e_b , \rho''[xs_0 \mapsto b_0 ... xs_i \mapsto b_i] , c \rangle$ \\
-$\;\;\;\;\;\;\;\;\;\;  [\;] , \rho' , c) $
-& $ \mae_s = \mae_s \mdoubleplus [\mae] $ \\
-& $ \sigma[b_0 \mapsto \mae_{s0} ... b_i \mapsto \mae_{si}] $  \\
-\hline
 %%%%% APP KONTINUATION MORE
 $ \textbf{appk}(done, e_h::e_t , \rho' , c) $
 & $\langle e_h , \rho' , b \rangle$ \\
-& $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [\mae] , e_t , \rho' , c)] $ \\
+& $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [v] , e_t , \rho' , c)] $ \\
+\hline
+%%%%% APP KONTINUATION DONE PRIM
+$ \textbf{appk}(op :: v_s , [] , \rho' , c) $
+& $\langle v' , \rho' , c \rangle$ \\
+& $ v' = op $ applied to $(v_s \mdoubleplus [v])$ \\
+\hline
+%%%%% APP KONTINUATION DONE CLO
+$ \textbf{appk}(clo :: v_s, [\;] , \rho' , c) $
+& $\langle e_b , \rho_{\lambda}[xs_0 \mapsto b_0 ... xs_i \mapsto b_i] , c \rangle$ \\
+where $ clo = (\lamsyn{xs}{e_b} , \rho_{\lambda}) $ & $ v'_s = v_s \mdoubleplus [v] $ \\
+& $ \sigma[b_0 \mapsto v'_{s0} ... b_i \mapsto v'_{si}] $  \\
 \hline
 \end{tabular}
 \end{center}
 
-
-
-
-
-
-
 \newpage
-
-
 
 \section{Formalization of an Abstract CESK* machine with basic Scheme features.}
 
