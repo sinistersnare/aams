@@ -63,9 +63,9 @@ e \in \textsf{Exp} &::= \mae \\
 				&|\; \applysyn{e}{e} \\
 				&|\; (e\;e\;...) \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EXPRESSIONS %%%%%%%%%%%%%%%%%%%%%%%%%
-\mae \in \textsf{AExp} &::= lam\;|\; \mathbb{Z}
+\mae \in \textsf{AExp} &::= x\;|\; lam\;|\; \mathbb{Z}
 							\;|\; \truesyn \;|\; \falsesyn \\
-				&\;\;\;\;\;\;\;\;\;\;\;\;\;\; |\; \quotesyn{e} \\
+				&\;\;\;\;\;\;\;\;\;\, |\; \quotesyn{e} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% LAMBDA EXPRESSIONS %%%%%%%%%%%%%%%%%%%%%%%%%
 lam \in \textsf{Lam} &::= \lamsyn{x}{e} \;|\; \vararglamsyn{x}{e} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% VARIABLE SET %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -75,30 +75,47 @@ op \in \textsf{Prim} &\;\;\;\;\;\; \text{A set of primitives}
 %%%%%%%%%%%%%%%%%%%%%%%%% END SYNTAX DOMAINS %%%%%%%%%%%%%%%%%%%%%%%%%
 \end{align*}
 \end{center}
+%%%%%%%%%%%%%%%%%%%%% OTHER THINGS COLUMN 1! %%%%%%%%%%%%%%%%%%
 \vspace{-10mm}
+%%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
 \textbf{Atomic Evaluation:}
-%%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%%%%%%%%%%
+$ \mathcal{A} : \Sigma_E \times \sigma \rightharpoonup \textit{Val} $ \\
+$ \mathcal{A}( \langle lam , \rho , \_ , \_ \rangle, \_) 
+			\triangleq (lam , \rho) $ \\
+$ \mathcal{A}( \langle \quotesyn{e} , \_ , \_ , \_ \rangle, \_) 
+			\triangleq \textbf{quote}(e) $ \\
+$ \mathcal{A}( \langle x , \rho , \_ , \_ \rangle, \sigma) 
+			\triangleq \sigma(\rho(x)) $ \\
+$ \mathcal{A}( \langle \mae , \_ , \_ , \_ \rangle, \_) 
+			\triangleq \mae $ \\
 \end{center}
 \vspace{-10mm}
+%%%%%%%%%%%%%%%%%%%%%%%%% TICK/ALLOC FUNCTIONS %%%%%%%%%%%%%%%%
+\begin{center}
+\textbf{Tick/Alloc:} \\
+$ tick : \Sigma \times \mathbb{N} \rightarrow \textit{Time} $ \\
+$ tick(\langle \_, \_ , \_, t \rangle, n) \triangleq (t + n) $ \\
+$ alloc : \Sigma \times \mathbb{N} \triangleq \textit{Addr} $ \\
+$ alloc(\langle \_, \_ , \_, t \rangle, n) \triangleq (t + n) $ \\
+\end{center}
+\vspace{-10mm}
+%%%%%%%%%%%%%%%%%%%%%%%%% INJECTION %%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{center}
+\textbf{Injection:} \\
+$\mathcal{I} : \textsf{Exp} \rightarrow \Sigma $ \\
+$ \mathcal{I}(e) \triangleq (e , \varnothing , 0 , 1)$ \\
+Initial $\sigma$ state $\triangleq \{ 0 : \textbf{mt} \} $ \\
+\end{center}
+\vspace{-10mm}
+%%%%%%%%%%%%%%%%%%%%%%%%% TRANSITION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
 \textbf{Transition:}
-%%%%%%%%%%%%%%%%%%%%%%%%% TRANSITION %%%%%%%%%%%%%%%%%%%%%%%%%
 \end{center}
 \vspace{-10mm}
+%%%%%%%%%%%%%%%%%%%%%%%%% COLLECTING SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-\textbf{Injection:}
-%%%%%%%%%%%%%%%%%%%%%%%%% INJECTION %%%%%%%%%%%%%%%%%%%%%%%%%
-\end{center}
-\vspace{-10mm}
-\begin{center}
-\textbf{Collection:}
-%%%%%%%%%%%%%%%%%%%%%%%%% COLLECTION %%%%%%%%%%%%%%%%%%%%%%%%%
-\end{center}
-\vspace{-10mm}
-\begin{center}
-\textbf{Tick/Alloc:}
-%%%%%%%%%%%%%%%%%%%%%%%%% TICK/ALLOC FUNCTIONS %%%%%%%%%%%%%%%%
+\textbf{Collecting Semantics:}
 \end{center}
 \vspace{-10mm}
 
@@ -116,7 +133,8 @@ op \in \textsf{Prim} &\;\;\;\;\;\; \text{A set of primitives}
 \begin{center}
 \begin{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%
-\varsigma \in \Sigma &\triangleq \textit{Eval} + \textit{Apply} \\
+\varsigma \in \Sigma &\triangleq E\langle\textit{Eval}\rangle 
+								+ A\langle\textit{Apply}\rangle \\
 \textit{Eval} &\triangleq \:\;\textsf{Exp} \times \textit{Env} \\
 						& \times \textit{Addr} \times \textit{Time} \\
 \textit{Apply} &\triangleq \:\;\,\textit{Val} \times \textit{Env} \\
@@ -140,10 +158,11 @@ t,u \in \textit{Time} &\triangleq \mathbb{N} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% KONTINUATIONS %%%%%%%%%%%%%%%%%%%%%%%%%
 \kappa \in \textit{Kont} &::= \textbf{mt} \\
         &|\; \textbf{ifk}(e, e, \rho, a) \\
-        &|\; \textbf{callcck}(a)\;|\; \textbf{setk}(x, a) \\
+        &|\; \textbf{callcck}(a) \\
+        &|\; \textbf{setk}(x, \rho, a) \\
         &|\; \textbf{appappk}(val?, e, \rho, a) \\
         &|\; \textbf{appk}(done, todo, \rho, a) \\
-        &|\; \textbf{appprimk}(op, a) \\
+        &|\; \textbf{appprimk}(op, \rho, a) \\
         &|\; \textbf{primk}(op, done, todo, \\
         &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\rho, a) \\
         &|\; \textbf{letk}(vars, done, todo \\
@@ -151,7 +170,8 @@ t,u \in \textit{Time} &\triangleq \mathbb{N} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% OTHER VARIABLES %%%%%%%%%%%%%%%%%%%%%%%%%
 %%% done/todo variables
 done &\triangleq \textit{Val}^* \\
-todo &\triangleq \textsf{Exp}^*
+todo &\triangleq \textsf{Exp}^* \\
+vars &\triangleq \textsf{Var}^*
 \end{align*}
 \end{center}
 \end{multicols*}
@@ -377,6 +397,7 @@ u &= tick(\varsigma, 1)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%% BEGIN APPLY SEMANTICS %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpage
@@ -396,13 +417,13 @@ v , \rho , a , t
 \rangle
 \leadsto
 E\langle
-e_f , \rho , b , u
+e_f , \rho , c , u
 \rangle
 \]
 \vspace{-12mm}
 \begin{align*}
 \text{where}\; \kappa &\triangleq \sigma(a) \\
-\kappa &= \textbf{ifk}(e_t, e_f, \rho, a) \\
+\kappa &= \textbf{ifk}(e_t, e_f, \rho, c) \\
 u &= tick(\varsigma, 1) \\
 v &= \falsesyn
 \end{align*}
@@ -413,250 +434,364 @@ v , \rho , a , t
 \rangle
 \leadsto
 E\langle
-e_t , \rho , b , u
+e_t , \rho , c , u
 \rangle
 \]
 \vspace{-10mm}
 \begin{align*}
 \text{where}\; \kappa &\triangleq \sigma(a) \\
-\kappa &= \textbf{ifk}(e_t, e_f, \rho, a) \\
+\kappa &= \textbf{ifk}(e_t, e_f, \rho, c) \\
 u &= tick(\varsigma, 1) \\
 v &\not= \falsesyn
 \end{align*}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\vfill\null
-\columnbreak
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%% IF EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% LET KONT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
 A\langle
 v , \rho , a , t
 \rangle
 \leadsto
 E\langle
-e_c , \rho , b , u
+e_b , \rho'_{\kappa} , c , u
 \rangle
 \]
-\vspace{-13mm}
+\vspace{-10mm}
 \begin{align*}
-\text{where}&\; \sigma[b \mapsto \textbf{ifk}(e_t, e_f, \rho, a)] \\
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{letk}(vars, done, [\;],\\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_b , \rho_{\kappa}, c) \\
+\rho'_{\kappa} &= \rho_{\kappa}[vars_0 \mapsto b_0\;...\\
+&\;\;\;\;\;\;\;\;\;  vars_n \mapsto b_n] \\
+\sigma[b_0 &\mapsto done_i ... b_n \mapsto done_n] \\
+b_i &= alloc(\varsigma, i) \\
+u &= tick(\varsigma, n)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% LET KONT MORE TODO %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_h , \rho_{\kappa} , b , u
+\rangle
+\]
+\vspace{-10mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{letk}(vars, done, e_h::e_t, \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_b , \rho_{\kappa}, c) \\
+\sigma[b &\mapsto \textbf{letk}(vars, done \mdoubleplus [v], \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , e_b , \rho_{\kappa} , c)] \\
 b &= alloc(\varsigma, 0) \\
 u &= tick(\varsigma, 1)
 \end{align*}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% COLUMN BREAK %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\vfill\null
+\columnbreak
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% COLUMN BREAK %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC MULTIARG KONT %%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e , \rho' , c , u
+\rangle
+\]
+\vspace{-13mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{callcck}(c) \\
+v &= (\singlelamsyn{x}{e} , \rho_{\lambda}) \\
+\rho' &= \rho_{\lambda}[x \mapsto c] \\
+u &= tick(\varsigma, 1)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e , \rho' , c , u
+\rangle
+\]
+\vspace{-10mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \textbf{ TODO }\\
+\kappa &= \textbf{callcck}(c) \\
+v &= \kappa' \\
+\rho' &= \rho_{\lambda}[x \mapsto c] \\
+u &= tick(\varsigma, 1)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+A\langle
+\textit{Void} , \rho_{\kappa} , c , u
+\rangle
+\]
+\vspace{-10mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a)\\
+\kappa &= \textbf{setk}(x, \rho_{\kappa}, c) \\
+\sigma&[\rho_{\kappa}(x) \mapsto v] \\
+u &= tick(\varsigma, 1)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST KONT NOT DONE %%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e , \rho_{\kappa} , b , u
+\rangle
+\]
+\vspace{-10mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a)\\
+\kappa &= \textbf{appappk}(\varnothing, e, \rho_{\kappa}, c) \\
+\sigma[b &\mapsto \textbf{appappk}(v, e, \rho_{\kappa}, c)] \\
+b &= alloc(\varsigma, 0) \\
+u &= tick(\varsigma, 1)
+\end{align*}
+\end{multicols*}
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% MORE APPLY SEMANTICS %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{multicols*}{2}
+[
+\begin{center}
+\textbf{More Apply Rules} \\
+Rules for when the control is a value
+\end{center}
+]
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_b , \rho'_{\lambda} , c , u
+\rangle
+\]
+\vspace{-14mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appappk}(v_f,\_, \rho_{\kappa}, c) \\
+v_f &= (\lamsyn{x_s}{e_b}, \rho_{\lambda}) \\
+\rho'_{\lambda} &= \rho_{\lambda}[x_0 \mapsto b_0\;...\; x_n \mapsto b_n] \\
+\sigma[b_0 &\mapsto v_0\;...\; b_n \mapsto v_n] \\
+b_i &= alloc(\varsigma, i) \\
+u &= tick(\varsigma, n)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_b , \rho'_{\lambda} , c , u
+\rangle
+\]
+\vspace{-10.5mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appappk}(v_f,\_, \rho_{\kappa}, c) \\
+v_f &= (\vararglamsyn{x}{e_b}, \rho_{\lambda}) \\
+\rho'_{\lambda} &= \rho_{\lambda}[x \mapsto b] \\
+\sigma[b &\mapsto v] \\
+b &= alloc(\varsigma, 0) \\
+u &= tick(\varsigma, 1)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION NOT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_h , \rho_{\kappa} , b , u
+\rangle
+\]
+\vspace{-10mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appk}(done, e_h::e_t, \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\; \rho_{\kappa}, c) \\
+\sigma[b &\mapsto \textbf{appk}(done \mdoubleplus [v], \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , \rho_{\kappa} , c)] \\
+b &= alloc(\varsigma, 0) \\
+u &= tick(\varsigma, 1)
+\end{align*}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% COLUMN BREAK %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\vfill\null
+\columnbreak
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% COLUMN BREAK %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_b , \rho'_{\lambda} , c , u
+\rangle
+\]
+\vspace{-9mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appk}(done, [\;], \rho_{\kappa}, c) \\
+done &= (\lamsyn{x_s}{e_b}, \rho_{\lambda}) :: v_s \\
+\rho'_{\lambda} &= \rho_{\lambda}[x_0 \mapsto b_0 \;...\; x_n \mapsto b_n] \\
+v'_s &= v_s \mdoubleplus [v] \\
+\sigma[b_0 &\mapsto v'_0 \;...\; b_n \mapsto v'_n] \\
+b_i &= alloc(\varsigma, i) \\
+u &= tick(\varsigma, n)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_b , \rho'_{\lambda} , c , u
+\rangle
+\]
+\vspace{-9mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appk}(done, [\;], \rho_{\kappa}, c) \\
+done &= (\vararglamsyn{x}{e_b}, \rho_{\lambda}) :: v_s \\
+\rho'_{\lambda} &= \rho_{\lambda}[x \mapsto b] \\
+v' &= (done \mdoubleplus [v]) \text{ as a cons-list} \\
+\sigma[b &\mapsto v'] \\
+b &= alloc(\varsigma, 0) \\
+u &= tick(\varsigma, 1)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION KONTINUATION %%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+A\langle
+v , \rho_{\kappa} , b , u
+\rangle
+\]
+\vspace{-10mm}
+\begin{align*}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appk}([\kappa_{\lambda}], [\;], \rho_{\kappa}, c) \\
+\sigma[b &\mapsto \kappa_{\lambda}] \\
+b &= alloc(\varsigma, 0) \\
+u &= tick(\varsigma, 1)
+\end{align*}
 \end{multicols*}
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% MORE APPLY SEMANTICS %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 3 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \newpage
-
-
 \begin{multicols*}{2}
+[
 \begin{center}
-\textbf{Syntax:}
+\textbf{More Apply Rules} \\
+Rules for when the control is a value
 \end{center}
-\vspace{-7mm}
+]
+%%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+A\langle
+v' , \rho' , c , u
+\rangle
+\]
+\vspace{-13mm}
 \begin{align*}
-%%% Expressions
-e \in \textsf{Exp} &::= \mae \\
-				  & \;|\; \ifsyn{e}{e}{e}  \\
-				  & \;|\; \letsyn{x}{e}{e} \\
-				  & \;|\; \primsyn{op}{e}{e} \\
-				  & \;|\; \callccsyn{e} \\
-				  & \;|\; (e \; e \; ...) \\
-%%% Atomic Expressions
-\mae \in \textsf{AExp} &::= lam \;|\; \mathbb{Z} \;|\; \truesyn \;|\; \falsesyn \\
-%%% Lambdas
-lam \in \textsf{Lam} &::= \lamsyn{x}{e} \\
-%%% Variables
-x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers}
+\text{where}\; \kappa &\triangleq \sigma(a) \\
+\kappa &= \textbf{appprimk}(op, \rho', c) \\
+v' &= op \text{ applied to } v \\
+u &= tick(\varsigma, 1)
 \end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% PRIM KONT NOT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+E\langle
+e_h , \rho' , b , u
+\rangle
+\]
 \vspace{-10mm}
-\begin{center}
-\begin{center}
-\textbf{Atomic Evaluation Function:}
-\end{center}
-\vspace{-7mm}
 \begin{align*}
-\mathcal{A} : (\textsf{AExp} & \times \textit{Env} \times \textit{Store}) \rightarrow Val \\
-\mathcal{A}(x, \rho, \sigma) &\triangleq \sigma(\rho(x)) \\
-\mathcal{A}(lam, \rho, \sigma) &\triangleq (lam , \rho) \\
-\mathcal{A}(\mae, \rho, \sigma) &\triangleq \mae
+\text{where}\; \kappa &\triangleq \sigma(a)\\
+\kappa &= \textbf{primk}(op, done, e_h::e_t, \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; \rho', c) \\
+\sigma[b &\mapsto \textbf{primk}(op, done \mdoubleplus [v], \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t, \rho', c)] \\
+b &= alloc(\varsigma, 0) \\
+u &= tick(\varsigma, 1)
 \end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% PRIM KONT DONE %%%%%%%%%%%%%%%%%%
+\[
+A\langle
+v , \rho , a , t
+\rangle
+\leadsto
+A\langle
+v' , \rho' , c , u
+\rangle
+\]
 \vspace{-10mm}
-\begin{center}
-\textbf{Transition Function:}
-\end{center}
-\vspace{-7mm}
 \begin{align*}
-(\Sigma \times \textit{Store}) \leadsto (\Sigma \times \textit{Store})
+\text{where}\; \kappa &\triangleq \sigma(a)\\
+\kappa &= \textbf{primk}(op, done, [\;], \rho', c) \\
+v' &= op \text{ applied to } (done \mdoubleplus [v]) \\
+u &= tick(\varsigma, 1)
 \end{align*}
-%%%%% COLUMN BREAK %%%%%%
-\vfill\null
-\columnbreak
-%%%%% COLUMN BREAK %%%%%%
-\textbf{Semantics:}
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-%%% State
-\varsigma \in \Sigma &\triangleq \textsf{Exp} \times \textit{Env} \times \textit{Addr} \\
-%%% Environment
-\rho \in \textit{Env} &\triangleq \textsf{Var} \rightharpoonup \textit{Addr} \\
-%%% Store
-\sigma \in \textit{Store} &\triangleq \textit{Addr} \rightharpoonup \textit{Val} \\
-%%% Values
-v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} \\
-	& \;\;\;\; + \mathbb{Z} + \{\truesyn, \falsesyn\} \\
-%%% Closures
-clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
-%%% Addresses
-a,b,c \in \textit{Addr} &\;\;\;\;\; \text{A set of addreses} \\
-%%% Kontinuations
-\kappa \in \textit{Kont} &\triangleq \textbf{mt} \\
-        &\;\; \;|\; \textbf{ifk}(e, e, \rho, a) \\
-        &\;\; \;|\; \textbf{letk}(x, e, \rho, a) \\
-        &\;\; \;|\; \textbf{appk}(done, todo, \\
-        &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\rho, a) \\
-        &\;\; \;|\; \textbf{primk}(op, done, todo, \\
-        &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\rho, a) \\
-        &\;\; \;|\; \textbf{callcck}(a) \\
-%%% Primitives
-op \in \textit{Prim} &\;\;\;\;\; \text{A set of primitives} \\
-%%% done/todo variables
-done &\triangleq \textit{Val}^* \\
-todo &\triangleq \textsf{Exp}^*
-\end{align*}
-\end{multicols*} %%%%% END MULTI COLUMNS
-
-
-\newpage
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%
-%%% Begin Transition Semantics
-%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{center}
-\begin{tabular}{@{}l | r@{}}
-\multicolumn{2}{c}{$(\varsigma \times \sigma) \leadsto (\varsigma' \times \sigma)$, 
-where $\kappa = \sigma(a) , b = alloc(\varsigma) $} \\
-\multicolumn{2}{c}{proceed by matching on $\varsigma$} \\
-\hline\hline
-%%%%% IF EXP
-$\langle
-\ifsyn{e_c}{e_t}{e_f} , \rho , a
-\rangle$
-&$\langle
-e_c , \rho , b 
-\rangle$ \\
-& $\sigma[b \mapsto \textbf{ifk}(e_t , e_f , \rho , a)]$ \\
-\hline
-%%%%% LET EXP
-$\langle
-\letsyn{x}{e_x}{e_b} , \rho , a
-\rangle$
-&$\langle
-e_x , \rho , b
-\rangle$ \\
-& $\sigma[b \mapsto \textbf{letk}(x , e_b , \rho , a)]$ \\
-\hline
-%%%%% PRIM EXP
-$\langle
-\primsyn{op}{e_0}{es} , \rho , a
-\rangle$
-&$\langle
-e_0 , \rho , b
-\rangle$ \\
-& $\sigma[b \mapsto \textbf{appk}([op] ,  es , \rho , a)]$ \\
-\hline
-%%%%% CALL/CC EXP
-$\langle
-\callccsyn{e} , \rho , a
-\rangle$
-&$\langle
-e , \rho , b
-\rangle$ \\
-&$\sigma[b \mapsto \textbf{appk}([\textbf{call/cc}] , [\;] , \rho , a)]$ \\
-\hline
-%%%%% APPLICATION EXP
-$\langle
-(e_f \; es ...) , \rho , a
-\rangle$
-&$\langle
-e_f , \rho , b
-\rangle$ \\
-& $\sigma[b \mapsto \textbf{appk}([\;] , e_s , \rho , a)]$ \\
-\hline
-%%%%% ATOMIC EXP -- TIME TO MATCH ON K
-$\langle \mae , \rho , a \rangle$ & \\
-let $v = \mathcal{A}(\mae, \rho, \sigma)$ \\
-match on $\kappa$ below \\
-\hline
-%%%%% MT KONTINUATION
-$ \textbf{mt}$ & $\varsigma$ \\
-\hline
-%%%%% IF KONTINUATION FALSE
-$ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
-& $\langle e_f , \rho' , c \rangle$ \\
-when $v = \falsesyn$ & \\
-\hline
-%%%%% IF KONTINUATION TRUE
-$ \textbf{ifk}(e_t , e_f , \rho' , c) $ 
-& $\langle e_t , \rho' , c \rangle$ \\
-when $v \not= \falsesyn$ & \\
-\hline
-%%%%% LET KONTINUATION
-$ \textbf{letk}(x , e_b , \rho' , c) $
-& $\langle e_b , \rho'[x \mapsto b] , c \rangle$ \\
-& $ \sigma[b \mapsto v] $ \\
-\hline
-%%%%% APP KONTINUATION MORE
-$ \textbf{appk}(done, e_h::e_t , \rho' , c) $
-& $\langle e_h , \rho' , b \rangle$ \\
-& $ \sigma[b \mapsto \textbf{appk}(done \mdoubleplus [v] , e_t , \rho' , c)] $ \\
-\hline
-%%%%% APP KONTINUATION DONE PRIM
-$ \textbf{appk}(op :: v_s , [\;] , \rho' , c) $
-& $\langle v' , \rho' , c \rangle$ \\
-& $ v' = op $ applied to $(v_s \mdoubleplus [v])$ \\
-\hline
-%%%%% APP KONTINUATION DONE CLO
-$ \textbf{appk}(clo :: v_s, [\;] , \rho' , c) $
-& $\langle e_b , \rho_{\lambda}[x_{s0} \mapsto b_0 \;...\; x_{sn} \mapsto b_n] , c \rangle$ \\
-where $ clo = (\lamsyn{x_s}{e_b} , \rho_{\lambda}) $ & $ v'_s = v_s \mdoubleplus [v] $ \\
-& $ \sigma[b_0 \mapsto v'_{s0} \;...\; b_n \mapsto v'_{sn}] $  \\
-\hline
-%%%%% CALL/CC CALL
-$\textbf{appk}([\textbf{call/cc}] , [\;] , \rho' , c)$
-&$\langle
-e , \rho_{\lambda}[x \mapsto c] , c
-\rangle$ \\
-where $v = (\singlelamsyn{x}{e} , \rho_{\lambda})$\\
-\hline
-%%%%% CALL/CC USE KONT
-$\textbf{appk}([\kappa_v] , [\;] , \rho' , c)$
-&$\langle
-v , \rho' , b
-\rangle$\\
-&$\sigma[b \mapsto \kappa_v]$ \\
-\hline
-\end{tabular}
-\end{center}
-
-Rules returning a value in control position are broken!
-Values are not syntax! What is the solution\textinterrobang
-
+\end{multicols*}
 \newpage
 
 \section{Abstract Semantics of Scheme CESK*}
