@@ -16,16 +16,18 @@
 (struct appk (done todo env nextkaddr) #:transparent)
 (struct mtk () #:transparent)
 
+
+(define (continuation-frame? v)
+  (match v
+    [(or (? ifk?) (? letk?) (? appk?) (? mtk?)) #t]
+    [else #f]))
+
 (define prims
   (hash '+ (prim +)
         'equal? (prim equal?)
         'number? (prim number?)
-        'boolean? (prim boolean?)))
-
-(define (continuation? v)
-  (match v
-    [(or (? ifk?) (? letk?) (? appk?) (? mtk?)) #t]
-    [else #f]))
+        'boolean? (prim boolean?)
+        'continuation? (prim continuation-frame?)))
 
 (define (lambda? e)
   (match e
@@ -96,9 +98,14 @@
      (define extended-lamenv (hash-union lamenv new-bindings #:combine (λ (a b) b)))
      (state eb extended-lamenv c)]
     [(appk (list 'call/cc) '() envprime c)
-     (match-define (closure `(λ (,kvar) ,ebody) cloenv) v)
-     (state ebody (hash-set cloenv kvar c) c)]
-    [(appk (list (? continuation? retk)) '() envprime c)
+     ; 2 rules here, one for when v = clo, one for when v = kont
+     (match v
+       [(closure `(λ (,kvar) ,ebody) cloenv)
+        (state ebody (hash-set cloenv kvar c) c)]
+       [(? continuation-frame? karg)
+        (define b (add-to-store! v st))
+        (state k env b)])]
+    [(appk (list (? continuation-frame? retk)) '() envprime c)
      (define b (add-to-store! retk st))
      (state v envprime b)]))
 
