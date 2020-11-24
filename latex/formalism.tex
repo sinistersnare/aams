@@ -148,12 +148,13 @@ Initial $\sigma$ state $\triangleq \{ 0 : \textbf{mt} \} $ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% VALUES %%%%%%%%%%%%%%%%%%%%%%%%%
 v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} + \mathbb{Z} \\
 				&+ \{ \truesyn,\falsesyn, \textit{Null} , \textit{Void} \} \\
-				&+ \{\textbf{quote}(e) \;,\; \textbf{cons}(v, v)\} \\
+				&+ \{\textbf{quote}(e)\} \\
+				&+ \{\textbf{cons}(v, v)\} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%
 clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ADDRESSES %%%%%%%%%%%%%%%%%%%%%%%%%
 a,b,c \in \textit{Addr} &\triangleq \mathbb{N} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% TIME %%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% TIME %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 t,u \in \textit{Time} &\triangleq \mathbb{N} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% KONTINUATIONS %%%%%%%%%%%%%%%%%%%%%%%%%
 \kappa \in \textit{Kont} &::= \textbf{mt} \\
