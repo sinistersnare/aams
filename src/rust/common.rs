@@ -237,9 +237,9 @@ pub fn matches_number(str: &str) -> Option<i64> {
 
 pub fn matches_boolean(str: &str) -> Option<bool> {
    // because we cant parse #t/#f rn, just use true/false.
-   if str == "true" {
+   if str == "#t" {
       Some(true)
-   } else if str == "false" {
+   } else if str == "#f" {
       Some(false)
    } else {
       None

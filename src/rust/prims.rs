@@ -54,6 +54,13 @@ fn prim_cdr(args: &[Val]) -> Val {
    }
 }
 
+fn prim_null(args: &[Val]) -> Val {
+   if !args.is_empty() {
+      panic!("Null takes 0 arguments, Given {}", args.len());
+   }
+   Val::Null
+}
+
 lazy_static! {
    pub static ref PRIMS: HashMap<&'static str, fn(&[Val]) -> Val> = {
       let mut m = HashMap::new();
@@ -62,6 +69,7 @@ lazy_static! {
       m.insert("cons", prim_cons as fn(&[Val]) -> Val);
       m.insert("car", prim_car as fn(&[Val]) -> Val);
       m.insert("cdr", prim_cdr as fn(&[Val]) -> Val);
+      m.insert("null", prim_null as fn(&[Val]) -> Val);
       m
    };
 }
