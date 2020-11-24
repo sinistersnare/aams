@@ -38,6 +38,12 @@ By abstracting an abstract machine we can theorize possible inputs
 and outputs to a program. Then, we can use these possible inputs and
 outputs to inform an optimization.
 
+
+## Concrete Implementations ##
+
+I implemented the formalization in `latex/formalism.pdf` in Rust and in Racket.
+
+
 ## License ##
 
 MIT license! Enjoy!

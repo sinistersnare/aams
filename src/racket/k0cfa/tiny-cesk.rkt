@@ -40,7 +40,7 @@
         'number? (prim number?)
         'boolean? (prim boolean?)
         'continuation? (prim continuation-frame?)
-        'cons (prim cons) 'car (prim car) 'cdr (prim cdr)))
+        'cons (prim cons) 'car (prim car) 'cdr (prim cdr) 'null (prim (λ () null))))
 
 (define (lambda? e)
   (match e
@@ -129,7 +129,7 @@
     [`(apply-prim ,op ,e)
      (define b (alloc st 0))
      (define u (tick st 1))
-     (add-to-store! b (appprimk (hash-ref prims op) a))
+     (add-to-store! b (appprimk (hash-ref prims op) p a))
      (E e p b u)]
     [`(apply ,ef ,ex)
      (define b (alloc st 0))
@@ -233,7 +233,6 @@
      (add-to-store! b (appk (append done (list v)) et pk c))
      (E eh pk b u)]))
 
-
 ; forms an initial state from an expression
 (define (inject e) (E e (hash) (addr 0) (time 1)))
 
@@ -254,6 +253,7 @@
   (run state0))
 
 (define e evaluate)
+
 
 
 
