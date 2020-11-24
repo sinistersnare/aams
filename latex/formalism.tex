@@ -148,7 +148,7 @@ Initial $\sigma$ state $\triangleq \{ 0 : \textbf{mt} \} $ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% VALUES %%%%%%%%%%%%%%%%%%%%%%%%%
 v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} + \mathbb{Z} \\
 				&+ \{ \truesyn,\falsesyn, \textit{Null} , \textit{Void} \} \\
-				&+ \textbf{quote}(e) + \textbf{cons}(v, v) \\
+				&+ \{\textbf{quote}(e) \;,\; \textbf{cons}(v, v)\} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%
 clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ADDRESSES %%%%%%%%%%%%%%%%%%%%%%%%%

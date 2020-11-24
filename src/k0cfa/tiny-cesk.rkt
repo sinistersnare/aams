@@ -235,7 +235,7 @@
 (define (inject e) (E e (hash) (addr 0) (time 1)))
 
 (define (fix? st0 st1)
-  (eq? st0 st1))
+  (equal? st0 st1))
 
 ; iterates an initial state until fixpoint
 (define (evaluate prog)
