@@ -4,7 +4,9 @@
 use combine::error::ParseError;
 use combine::parser::char::{char, space};
 use combine::stream::Stream;
-use combine::{between, choice, skip_many1, skip_many, many1, parser, token, satisfy, sep_by, Parser};
+use combine::{
+   between, choice, many1, parser, satisfy, sep_by, skip_many, skip_many1, token, Parser,
+};
 
 use crate::common::SExpr;
 
@@ -50,9 +52,13 @@ where
 }
 
 parser! {
-   pub fn expr[Input]()(Input) -> SExpr
+   fn expr[Input]()(Input) -> SExpr
    where [Input: Stream<Token = char>]
    {
       expr_()
    }
+}
+
+pub fn parse_expr(input: &str) -> Result<(SExpr, &str), combine::error::StringStreamError> {
+   expr().parse(input)
 }

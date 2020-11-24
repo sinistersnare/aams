@@ -1,8 +1,8 @@
 //!
 //! The evaluator of scheme ASTs.
 
-pub mod apply;
-pub mod eval;
+mod apply;
+mod eval;
 
 use crate::common::{Addr, Env, Kont, SExpr, SExprState, State, Store, Time, Val};
 use apply::apply_step;

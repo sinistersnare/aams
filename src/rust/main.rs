@@ -12,16 +12,14 @@ extern crate im;
 use std::env;
 use std::fs;
 
-use combine::Parser;
-
-pub mod common;
-pub mod eval;
-pub mod prims;
-pub mod read;
+mod common;
+mod eval;
+mod prims;
+mod read;
 
 use crate::common::State;
 use crate::eval::evaluate;
-use crate::read::expr;
+use crate::read::parse_expr;
 
 fn main() {
    if let Some(filename) = env::args().nth(1) {
@@ -37,7 +35,7 @@ fn start_repl() {
 
    loop {
       print!("> ");
-      stdout().flush().expect("Flushed poorly...?");
+      stdout().flush().expect("Flushed... poorly?");
       stdin()
          .read_line(&mut input)
          .expect("Did not enter a full string.");
@@ -47,7 +45,7 @@ fn start_repl() {
 }
 
 fn exec_string(program: &str) {
-   let parsed = expr().parse(program.trim());
+   let parsed = parse_expr(program.trim());
    match parsed {
       Ok((sexpr, _)) => {
          let (states, _store) = evaluate(sexpr);
