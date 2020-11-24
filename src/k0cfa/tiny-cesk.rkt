@@ -1,8 +1,6 @@
 #lang racket
 
-(require (only-in racket/hash hash-union))
-
-; this is a CESK* machine, with a globalized store.
+; this is a time-stamped CESK* machine, with a globalized store.
 ; it implements some basic scheme features like 'if', 'let',
 ; and multi argument functions. Also has numbers and booleans.
 
@@ -22,7 +20,7 @@
 
 (struct mtk () #:transparent)
 (struct ifk (et ef env a) #:transparent)
-(struct callcck (a) #:transparent)
+(struct callcck (env a) #:transparent)
 (struct setk (x env a) #:transparent)
 (struct appappk (mval e env a) #:transparent)
 (struct appk (done todo env a) #:transparent)
@@ -46,11 +44,13 @@
 
 (define (lambda? e)
   (match e
-    [`(λ (,_ ...) ,_) #t] ; standard multiarg lambda
+    [`(lambda ,x ,e) (println "use λ not 'lambda'") #f]
+    [`(λ (,x ...) ,_) #t] ; standard multiarg lambda
     [`(λ ,(? symbol?) ,_) #t] ; varag lambda
     [else #f]))
 
-; checks a syntactic expression to see if its an atomically evaluable expression
+; checks a syntactic expression to see
+; if its an atomically evaluable expression
 (define (atomic? v)
   (match v
     [(or (? symbol?) (? lambda?)
@@ -99,7 +99,7 @@
      (define u (tick st 1))
      (add-to-store! b (ifk et ef p a))
      (E ec p b u)]
-    [`(let () e)
+    [`(let () ,e)
      (define u (tick st 1))
      (E e p a u)]
     [`(let ([,x0 ,e0] [,xs ,es] ...) ,eb)
@@ -107,10 +107,10 @@
      (define u (tick st 1))
      (add-to-store! b (letk (cons x0 xs) '() es eb p a))
      (E e0 p b u)]
-    [`(call/cc e)
+    [`(call/cc ,e)
      (define b (alloc st 0))
      (define u (tick st 1))
-     (add-to-store! b (callcck a))
+     (add-to-store! b (callcck p a))
      (E e p b u)]
     [`(set! ,x ,e)
      (define b (alloc st 0))
@@ -166,14 +166,17 @@
      (define u (tick st 1))
      (add-to-store! b (letk vars (append done (list v)) et eb pk c))
      (E eh pk b u)]
-    [(callcck c)
-     #:when (lambda? v)
+    [(callcck _ c)
+     #:when (closure? v)
      (match-define (closure `(λ (,x) ,e) plam) v)
      (define plamprime (hash-set plam x c))
-        (E e plamprime c t)]
-    [(callcck c)
+     (E e plamprime c t)]
+    [(callcck pprime _)
      #:when (continuation-frame? v)
-     (raise 'idk-whats-going-on-here!)]
+     (define b (alloc st 0))
+     (define u (tick st 1))
+     (add-to-store! b v)
+     (A k pprime b u)]
     [(setk x pk c)
      (add-to-store! (hash-ref pk x) v)
      (A (void) pk c t)]
@@ -251,7 +254,6 @@
   (run state0))
 
 (define e evaluate)
-
 
 
 

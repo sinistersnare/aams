@@ -158,7 +158,7 @@ t,u \in \textit{Time} &\triangleq \mathbb{N} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% KONTINUATIONS %%%%%%%%%%%%%%%%%%%%%%%%%
 \kappa \in \textit{Kont} &::= \textbf{mt} \\
         &|\; \textbf{ifk}(e, e, \rho, a) \\
-        &|\; \textbf{callcck}(a) \\
+        &|\; \textbf{callcck}(\rho, a) \\
         &|\; \textbf{setk}(x, \rho, a) \\
         &|\; \textbf{appappk}(val?, e, \rho, a) \\
         &|\; \textbf{appk}(done, todo, \rho, a) \\
@@ -265,7 +265,7 @@ e , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{callcck}(a)]
+\sigma[b &\mapsto \textbf{callcck}(\rho, a)]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% SET EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{-5mm}
@@ -490,7 +490,7 @@ u &\triangleq tick(\varsigma, 1) \\
 
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC MULTIARG KONT %%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{callcck}(c)
+\textbf{callcck}(\_, c)
 \leadsto
 E\langle
 e , \rho'_{\lambda} , c , t
@@ -502,18 +502,19 @@ e , \rho'_{\lambda} , c , t
 \rho'_{\lambda} &\triangleq \rho_{\lambda}[x \mapsto c]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
-\textbf{ TODO WTF IS THIS CASE} \\ \vspace{-4mm}
 \[
-\textbf{callcck}(c)
+\textbf{callcck}(\rho' , \_)
 \leadsto
-E\langle
-e , \rho' , c , t
+A\langle
+\kappa , \rho' , b , u
 \rangle
 \]
 \vspace{-10mm}
 \begin{align*}
 \text{where } v &= \kappa' \\
-\rho' &\triangleq \rho[x \mapsto c]
+b &\triangleq alloc(\varsigma, 0) \\
+u &\triangleq tick(\varsigma, 1) \\
+\sigma[b &\mapsto \kappa']
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
