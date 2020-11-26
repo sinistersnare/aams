@@ -4,7 +4,6 @@
 ; it implements some basic scheme features like 'if', 'let',
 ; and multi argument functions. Also has numbers and booleans.
 
-;
 ; eval and apply states
 ;
 ; eval will evaluate expressions
@@ -18,35 +17,37 @@
 (struct quoteobj (sexpr) #:transparent)
 (struct prim (op) #:transparent)
 
-(struct mtk () #:transparent)
-(struct ifk (et ef env a) #:transparent)
-(struct callcck (env a) #:transparent)
-(struct setk (x env a) #:transparent)
-(struct appappk (mval e env a) #:transparent)
-(struct appk (done todo env a) #:transparent)
-(struct appprimk (op env a) #:transparent)
-(struct primk (op done todo env a) #:transparent)
-(struct letk (vars done todo e env a) #:transparent)
-
-(define (continuation-frame? v)
-  (match v
-    [(or (? mtk?) (? ifk?) (? callcck?) (? setk?) (? appappk?)
-         (? appk?) (? appprimk?) (? primk?) (? letk?)) #t]
-    [else #f]))
+(struct ktype () #:transparent) ; super-type for continuation frames
+(struct mtk ktype () #:transparent)
+(struct ifk ktype (et ef env a) #:transparent)
+(struct callcck ktype (env a) #:transparent)
+(struct setk ktype (x env a) #:transparent)
+(struct appappk ktype (mval e env a) #:transparent)
+(struct appk ktype (done todo env a) #:transparent)
+(struct appprimk ktype (op env a) #:transparent)
+(struct primk ktype (op done todo env a) #:transparent)
+(struct letk ktype (vars done todo e env a) #:transparent)
 
 (define prims
   (hash '+ (prim +)
+        '* (prim *)
         'equal? (prim equal?)
         'number? (prim number?)
         'boolean? (prim boolean?)
-        'continuation? (prim continuation-frame?)
+        'continuation? (prim ktype?)
+        'list (prim list)
         'cons (prim cons) 'car (prim car) 'cdr (prim cdr) 'null (prim (λ () null))))
 
+(define (lambda-start? s)
+  (match s
+    [(or (== 'λ) (== 'lambda)) #t]
+    [else #f]))
 (define (lambda? e)
   (match e
-    [`(lambda ,x ,e) (println "use λ not 'lambda'") #f]
-    [`(λ (,x ...) ,_) #t] ; standard multiarg lambda
-    [`(λ ,(? symbol?) ,_) #t] ; varag lambda
+    [`(,(? lambda-start?)
+       (,_ ...) ,_) #t] ; standard multiarg lambda
+    [`(,(? lambda-start?)
+       ,(? symbol?) ,_) #t] ; varag lambda
     [else #f]))
 
 ; checks a syntactic expression to see
@@ -168,11 +169,11 @@
      (E eh pk b u)]
     [(callcck _ c)
      #:when (closure? v)
-     (match-define (closure `(λ (,x) ,e) plam) v)
+     (match-define (closure `(,(? lambda-start?) (,x) ,e) plam) v)
      (define plamprime (hash-set plam x c))
      (E e plamprime c t)]
     [(callcck pprime _)
-     #:when (continuation-frame? v)
+     #:when (ktype? v)
      (define b (alloc st 0))
      (define u (tick st 1))
      (add-to-store! b v)
@@ -196,33 +197,33 @@
      (define u (tick st 1))
      (add-to-store! b (appappk v e pk c))
      (E e pk b u)]
-    [(appappk (closure `(λ (,xs ...) ,eb) plam) _ _ c)
+    [(appappk (closure `(,(? lambda-start?) (,xs ...) ,eb) plam) _ _ c)
      (define bs (map (λ (i) (alloc st i)) (range (length xs))))
      (define u (tick st (length xs)))
      (define plamprime (foldl (λ (k v res) (hash-set res k v)) plam xs bs))
      (foldl (λ (k v _) (add-to-store! k v)) (void) bs v)
      (E eb plamprime c u)]
-    [(appappk (closure `(λ ,x ,eb) plam) _ _ c)
+    [(appappk (closure `(,(? lambda-start?) ,x ,eb) plam) _ _ c)
      (define b (alloc st 0))
      (define u (tick st 1))
      (define plamprime (hash-set plam x b))
      (add-to-store! b v)
      (E eb plamprime)]
-    [(appk (cons (closure `(λ (,xs ...) ,eb) plam)  vs) '() pk c)
+    [(appk (cons (closure `(,(? lambda-start?) (,xs ...) ,eb) plam)  vs) '() _ c)
      (define bs (map (λ (i) (alloc st i)) (range (length xs))))
      (define u (tick st (length xs)))
      (define plamprime (foldl (λ (k v res) (hash-set res k v)) plam xs bs))
      (define vsprime (append vs (list v)))
      (foldl (λ (k v _) (add-to-store! k v)) (void) bs vsprime)
      (E eb plamprime c u)]
-    [(appk (cons (closure `(λ ,x ,eb) plam) vs) '() pk c)
+    [(appk (cons (closure `(,(? lambda-start?) ,x ,eb) plam) vs) '() _ c)
      (define b (alloc st 0))
      (define u (tick st 1))
      (define plamprime (hash-set plam x b))
      (define vsprime (append vs (list v)))
      (add-to-store! b vsprime)
      (E eb plamprime c u)]
-    [(appk (list (? continuation-frame? klam)) '() pk c)
+    [(appk (list (? ktype? klam)) '() pk _)
      (define b (alloc st 0))
      (define u (tick st 1))
      (add-to-store! b klam)
@@ -240,20 +241,17 @@
   (equal? st0 st1))
 
 ; iterates an initial state until fixpoint
-(define (evaluate prog)
+(define (evaluate program)
   (reset-store!)
-  (define state0 (inject prog))
-  (define states (cons state0 '()))
+  (define state0 (inject program))
   (define (run st)
     (define nextst (match st
-                     [(E _ _ _ _) (eval-step st)]
-                     [(A _ _ _ _) (apply-step st)]))
-    (set! states (cons nextst states))
+                     [(? E?) (eval-step st)]
+                     [(? A?) (apply-step st)]))
     (if (fix? nextst st) st (run nextst)))
   (run state0))
 
 (define e evaluate)
-
 
 
 

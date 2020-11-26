@@ -45,6 +45,7 @@
 % \maketitle
 \section{Concrete Semantics of Scheme CESK*}
 
+\small{
 \begin{multicols*}{2}
 \begin{center}
 \textbf{Syntax Domains:}
@@ -76,38 +77,43 @@ op \in \textsf{Prim} &\;\;\;\;\;\; \text{A set of primitives}
 \end{align*}
 \end{center}
 %%%%%%%%%%%%%%%%%%%%% OTHER THINGS COLUMN 1! %%%%%%%%%%%%%%%%%%
-\vspace{-10mm}
+\vspace{-7mm}
 %%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
 \textbf{Atomic Evaluation:}
-$ \mathcal{A} : \Sigma_E \times \sigma \rightharpoonup \textit{Val} $ \\
-$ \mathcal{A}( \langle lam , \rho , \_ , \_ \rangle, \_) 
-			\triangleq (lam , \rho) $ \\
-$ \mathcal{A}( \langle \quotesyn{e} , \_ , \_ , \_ \rangle, \_) 
-			\triangleq \textbf{quote}(e) $ \\
-$ \mathcal{A}( \langle x , \rho , \_ , \_ \rangle, \sigma) 
-			\triangleq \sigma(\rho(x)) $ \\
-$ \mathcal{A}( \langle \mae , \_ , \_ , \_ \rangle, \_) 
-			\triangleq \mae $ \\
+\vspace{-3mm}
+\begin{align*}
+\mathcal{A} : \Sigma_E \times \sigma &\rightharpoonup \textit{Val} \\
+\mathcal{A}( \langle lam , \rho , \_ , \_ \rangle, \_)  &\triangleq (lam , \rho) \\
+\mathcal{A}( \langle \quotesyn{e} , \_ , \_ , \_ \rangle, \_)  &\triangleq \textbf{quote}(e) \\
+\mathcal{A}( \langle x , \rho , \_ , \_ \rangle, \sigma) &\triangleq \sigma(\rho(x)) \\
+\mathcal{A}( \langle \mae , \_ , \_ , \_ \rangle, \_) &\triangleq \mae
+\end{align*}
 \end{center}
-\vspace{-10mm}
+\vspace{-7mm}
 %%%%%%%%%%%%%%%%%%%%%%%%% TICK/ALLOC FUNCTIONS %%%%%%%%%%%%%%%%
 \begin{center}
-\textbf{Tick/Alloc:} \\
-$ tick : \Sigma \times \mathbb{N} \rightarrow \textit{Time} $ \\
-$ tick(\langle \_, \_ , \_, t \rangle, n) \triangleq (t + n) $ \\
-$ alloc : \Sigma \times \mathbb{N} \triangleq \textit{Addr} $ \\
-$ alloc(\langle \_, \_ , \_, t \rangle, n) \triangleq (t + n) $ \\
+\textbf{Tick/Alloc:}
+\vspace{-3mm}
+\begin{align*}
+tick : \Sigma \times \mathbb{N} &\rightarrow \textit{Time} \\
+tick(\langle \_, \_ , \_, t \rangle, n) &\triangleq (t + n) \\
+alloc : \Sigma \times \mathbb{N} &\triangleq \textit{Addr} \\
+alloc(\langle \_, \_ , \_, t \rangle, n) &\triangleq (t + n) \\
+\end{align*}
 \end{center}
-\vspace{-10mm}
+\vspace{-14mm}
 %%%%%%%%%%%%%%%%%%%%%%%%% INJECTION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-\textbf{Injection:} \\
-$\mathcal{I} : \textsf{Exp} \rightarrow \Sigma $ \\
-$ \mathcal{I}(e) \triangleq (e , \varnothing , 0 , 1)$ \\
-Initial $\sigma$ state $\triangleq \{ 0 : \textbf{mt} \} $ \\
+\textbf{Injection:}
+\vspace{-3mm}
+\begin{align*}
+\mathcal{I} : \textsf{Exp} &\rightarrow \Sigma \\
+\mathcal{I}(e) &\triangleq (e , \varnothing , 0 , 1) \\
+\text{Initial } \sigma \text{ state } &\triangleq \{ 0 : \textbf{mt} \}
+\end{align*}
 \end{center}
-\vspace{-10mm}
+\vspace{-8mm}
 %%%%%%%%%%%%%%%%%%%%%%%%% TRANSITION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
 \textbf{Transition:}
@@ -133,14 +139,14 @@ Initial $\sigma$ state $\triangleq \{ 0 : \textbf{mt} \} $ \\
 \begin{center}
 \begin{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%
-\varsigma \in \Sigma &\triangleq E\langle\textit{Eval}\rangle 
+\varsigma \in \Sigma &\triangleq E\langle\textit{Eval}\rangle
 								+ A\langle\textit{Apply}\rangle \\
 \textit{Eval} &\triangleq \:\;\textsf{Exp} \times \textit{Env} \\
 						& \times \textit{Addr} \times \textit{Time} \\
 \textit{Apply} &\triangleq \:\;\,\textit{Val} \times \textit{Env} \\
 						& \times \textit{Addr} \times \textit{Time} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ENVIRONMENT %%%%%%%%%%%%%%%%%%%%%%%%%
-\rho \in \textit{Env} &\triangleq \textsf{Var} \rightharpoonup 
+\rho \in \textit{Env} &\triangleq \textsf{Var} \rightharpoonup
 												\textit{Addr} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% STORE %%%%%%%%%%%%%%%%%%%%%%%%%
 \sigma \in \textit{Store} &\triangleq \textit{Addr} \rightharpoonup
@@ -148,8 +154,7 @@ Initial $\sigma$ state $\triangleq \{ 0 : \textbf{mt} \} $ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% VALUES %%%%%%%%%%%%%%%%%%%%%%%%%
 v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} + \mathbb{Z} \\
 				&+ \{ \truesyn,\falsesyn, \textit{Null} , \textit{Void} \} \\
-				&+ \{\textbf{quote}(e)\} \\
-				&+ \{\textbf{cons}(v, v)\} \\
+				&+ \{\textbf{quote}(e) , \textbf{cons}(v, v)\} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%
 clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ADDRESSES %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -170,13 +175,13 @@ t,u \in \textit{Time} &\triangleq \mathbb{N} \\
         &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;e, \rho, a) \\
 %%%%%%%%%%%%%%%%%%%%%%%%% OTHER VARIABLES %%%%%%%%%%%%%%%%%%%%%%%%%
 %%% done/todo variables
-done &\triangleq \textit{Val}^* \\
+done &\triangleq \textit{Val}^\ast \\
 todo &\triangleq \textsf{Exp}^* \\
 vars &\triangleq \textsf{Var}^*
 \end{align*}
 \end{center}
 \end{multicols*}
-
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -192,9 +197,9 @@ vars &\triangleq \textsf{Var}^*
 Rules for when the control is an expression \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%
 \vspace{5mm}
-$E\langle \mae , \rho , a , t \rangle 
-\leadsto 
-A\langle v , \rho , a , t \rangle$ \\ 
+$E\langle \mae , \rho , a , t \rangle
+\leadsto
+A\langle v , \rho , a , t \rangle$ \\
 where $v \triangleq \mathcal{A}(\varsigma, \sigma)$ \\
 \vspace{-10mm}
 \end{center}
@@ -213,7 +218,7 @@ e_c , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{ifk}(e_t, e_f, \rho, a)]
+\sigma[b] &\triangleq \textbf{ifk}(e_t, e_f, \rho, a)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION NO ARGSVALS %%%%%%%%%%%%%%%%%%%
 \vspace{-5mm}
@@ -241,15 +246,15 @@ E\langle
 \[
 \leadsto
 E\langle
-e_{0} , \rho , b , u
+e_0 , \rho , b , u
 \rangle
 \]
 \vspace{-11mm}
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{letk}(x_0::x_s, \\
-&\;\;\;\;\;\;\;\; [\;], e_s, e_b, \rho, a)]
+\sigma[b] &\triangleq \textbf{letk}(x_0::x_s, \\
+&\;\;\;\;\;\;\;\; [\;], e_s, e_b, \rho, a)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{-5mm}
@@ -266,7 +271,7 @@ e , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{callcck}(\rho, a)]
+\sigma[b] &\triangleq \textbf{callcck}(\rho, a)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% SET EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{-5mm}
@@ -283,7 +288,7 @@ e , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{setk}(x, a)]
+\sigma[b] &\triangleq \textbf{setk}(x, a)
 \end{align*}
 
 
@@ -329,7 +334,7 @@ e_0 , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{primk}(op, [\;], e_s, \rho, a)]
+\sigma[b] &\triangleq \textbf{primk}(op, [\;], e_s, \rho, a)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM EXPRESSION %%%%%%%%%%%%%%%%
 \vspace{-5mm}
@@ -349,7 +354,7 @@ e , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{appprimk}(op, a)] \\
+\sigma[b] &\triangleq \textbf{appprimk}(op, a) \\
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY FUNCTION LIST EXPRESSION %%%%%%%%%%%%%%%%
 \vspace{-12mm}
@@ -369,7 +374,7 @@ e_f , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{appappk}(\varnothing , e_x , \rho, a)]
+\sigma[b] &\triangleq \textbf{appappk}(\varnothing , e_x , \rho, a)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION EXPRESSION %%%%%%%%%%%%%%%%
 \vspace{-5mm}
@@ -386,7 +391,7 @@ e_f , \rho , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{appk}([\;],  e_s , \rho, a)] \\
+\sigma[b] &\triangleq \textbf{appk}([\;],  e_s , \rho, a)
 \end{align*}
 \end{multicols*}
 
@@ -458,7 +463,7 @@ u &\triangleq tick(\varsigma, n) \\
 done' &\triangleq done \mdoubleplus [v] \\
 \rho'_{\kappa} &\triangleq \rho_{\kappa}[vars_0 \mapsto b_0\;...\\
 &\;\;\;\;\;\;\;\;\;  vars_{n-1} \mapsto b_{n-1}] \\
-\sigma[b_0 &\mapsto done'_0\;...\;b_{n-1} \mapsto done'_{n-1}]
+\sigma[b_0\;...\;b_{n-1}] &\triangleq done'_0\;...\;done'_{n-1}
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET KONT MORE TODO %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -475,8 +480,8 @@ e_h , \rho_{\kappa} , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{letk}(vars, done \mdoubleplus [v], \\
-&\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , e_b , \rho_{\kappa} , c)]
+\sigma[b] &\triangleq \textbf{letk}(vars, done \mdoubleplus [v], \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , e_b , \rho_{\kappa} , c)
 \end{align*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -515,7 +520,7 @@ A\langle
 \text{where } v &= \kappa' \\
 b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \kappa']
+\sigma[b] &\triangleq \kappa'
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -571,8 +576,8 @@ e_h , \rho_{\kappa} , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{primk}(op, done \mdoubleplus [v], \\
-&\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t, \rho_{\kappa}, c)]
+\sigma[b] &\triangleq \textbf{primk}(op, done \mdoubleplus [v], \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t, \rho_{\kappa}, c)
 \end{align*}
 \end{multicols*}
 \newpage
@@ -603,7 +608,7 @@ e , \rho_{\kappa} , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{appappk}(v, e, \rho_{\kappa}, c)]
+\sigma[b] &\triangleq \textbf{appappk}(v, e, \rho_{\kappa}, c)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -620,7 +625,7 @@ b_i &\triangleq alloc(\varsigma, i) \\
 u &\triangleq tick(\varsigma, n) \\
 \rho'_{\lambda} &\triangleq \rho_{\lambda}[x_0 \mapsto b_0\; ... \\
 &\;\;\;\;\;\;\;\;\;x_{n-1} \mapsto b_{n-1}] \\
-\sigma[b_0 &\mapsto v_0\;...\; b_{n-1} \mapsto v_{n-1}]
+\sigma[b_0\;...\; b_{n-1}] &\triangleq v_0\;...\;v_{n-1}
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -636,7 +641,7 @@ e_b , \rho'_{\lambda} , c , u
 b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
 \rho'_{\lambda} &\triangleq \rho_{\lambda}[x \mapsto b] \\
-\sigma[b &\mapsto v]
+\sigma[b] &\triangleq v
 \end{align*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -665,7 +670,7 @@ u &\triangleq tick(\varsigma, n) \\
 \rho'_{\lambda} &\triangleq \rho_{\lambda}[x_0 \mapsto b_0 \;... \\
 &\;\;\;\;\;\;\;\;\;x_{n-1} \mapsto b_{n-1}] \\
 v'_s &\triangleq v_s \mdoubleplus [v] \\
-\sigma[b_0 &\mapsto v'_0 \;...\; b_{n-1} \mapsto v'_{n-1}]
+\sigma[b_0] &\triangleq v'_0 \;...\; b_{n-1} \mapsto v'_{n-1}
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -682,7 +687,7 @@ b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
 \rho'_{\lambda} &\triangleq \rho_{\lambda}[x \mapsto b] \\
 v'_s &\triangleq (v_s \mdoubleplus [v]) \\
-\sigma[b &\mapsto v'_s]
+\sigma[b] &\triangleq v'_s
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION KONTINUATION %%%%%%%%%%%%%%%%%%%%%
 \[
@@ -696,7 +701,7 @@ v , \rho_{\kappa} , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \kappa_{\lambda}]
+\sigma[b] &\triangleq \kappa_{\lambda}
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION NOT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -713,8 +718,8 @@ e_h , \rho_{\kappa} , b , u
 \begin{align*}
 \text{where } b &\triangleq alloc(\varsigma, 0) \\
 u &\triangleq tick(\varsigma, 1) \\
-\sigma[b &\mapsto \textbf{appk}(done \mdoubleplus [v], \\
-&\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , \rho_{\kappa} , c)]
+\sigma[b] &\triangleq \textbf{appk}(done \mdoubleplus [v], \\
+&\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , \rho_{\kappa} , c)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% ITS OVER %%%%%%%%%%%%%%%%%%%%%%%%%
 \end{multicols*}
@@ -752,4 +757,3 @@ u &\triangleq tick(\varsigma, 1) \\
 
 
 \end{document}
-  

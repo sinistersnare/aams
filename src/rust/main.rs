@@ -1,9 +1,7 @@
-//! A shitty scheme interpreter that I made without
-//! looking at too much inspiration
-//! JK I ENDED UP USING https://github.com/rui314/minilisp/blob/master/minilisp.c
-//! FOR A LOT OF INSPIRATION!!!! TY MINILISP!
 //!
-//! I made this to study different continuation implementations.
+//! A Scheme interpreter based on the formalization found in this repo.
+//!
+
 #[macro_use]
 extern crate lazy_static;
 extern crate combine;
