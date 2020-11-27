@@ -196,7 +196,7 @@ vars &\triangleq \textsf{Var}^*
 \textbf{Eval Rules} \\
 Rules for when the control is an expression \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%
-\vspace{5mm}
+\vspace{15mm}
 $E\langle \mae , \rho , a , t \rangle
 \leadsto
 A\langle v , \rho , a , t \rangle$ \\
@@ -423,10 +423,10 @@ Proceed by matching on $\kappa$
 ]
 %%%%%%%%%%%%%%%%%%%%%%%%% IF KONT FALSE %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{ifk}(e_t, e_f, \rho, c)
+\textbf{ifk}(e_t, e_f, \rho_\kappa, c)
 \leadsto
 E\langle
-e_f , \rho , c , t
+e_f , \rho_\kappa , c , t
 \rangle
 \]
 \vspace{-13mm}
@@ -435,10 +435,10 @@ e_f , \rho , c , t
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% IF KONT TRUE %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{ifk}(e_t, e_f, \rho, c)
+\textbf{ifk}(e_t, e_f, \rho_\kappa, c)
 \leadsto
 E\langle
-e_t , \rho , c , t
+e_t , \rho_\kappa , c , t
 \rangle
 \]
 \vspace{-11mm}
@@ -460,9 +460,9 @@ e_b , \rho'_{\kappa} , c , u
 \begin{align*}
 \text{where } b_i &\triangleq alloc(\varsigma, i) \\
 u &\triangleq tick(\varsigma, n) \\
-done' &\triangleq done \mdoubleplus [v] \\
 \rho'_{\kappa} &\triangleq \rho_{\kappa}[vars_0 \mapsto b_0\;...\\
 &\;\;\;\;\;\;\;\;\;  vars_{n-1} \mapsto b_{n-1}] \\
+  done' &\triangleq done \mdoubleplus [v] \\
 \sigma[b_0\;...\;b_{n-1}] &\triangleq done'_0\;...\;done'_{n-1}
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET KONT MORE TODO %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -509,10 +509,10 @@ e , \rho'_{\lambda} , c , t
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{callcck}(\rho' , \_)
+\textbf{callcck}(\rho_\kappa , \_)
 \leadsto
 A\langle
-\kappa , \rho' , b , u
+\kappa , \rho_\kappa , b , u
 \rangle
 \]
 \vspace{-10mm}
@@ -532,7 +532,7 @@ A\langle
 \]
 \vspace{-10mm}
 \begin{align*}
-\text{where } \sigma&[\rho_{\kappa}(x) \mapsto v]
+\text{where } \sigma[\rho_{\kappa}(x)] &\triangleq v
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
@@ -542,7 +542,7 @@ A\langle
 v' , \rho_{\kappa} , c , t
 \rangle
 \]
-\vspace{-12mm}
+\vspace{-10mm}
 \begin{align*}
 \text{where } v' &\triangleq op \text{ applied to } v
 \end{align*}
@@ -557,7 +557,7 @@ A\langle
 v' , \rho_{\kappa} , c , t
 \rangle
 \]
-\vspace{-12mm}
+\vspace{-10mm}
 \begin{align*}
 \text{where } v' &\triangleq op \text{ applied to } (done \mdoubleplus [v])
 \end{align*}
@@ -612,7 +612,7 @@ u &\triangleq tick(\varsigma, 1) \\
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{appappk}(v_f,\_, \rho_{\kappa}, c)
+\textbf{appappk}(v_f,\_, \_, c)
 \leadsto
 E\langle
 e_b , \rho'_{\lambda} , c , u
@@ -629,7 +629,7 @@ u &\triangleq tick(\varsigma, n) \\
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{appappk}(v_f,\_, \rho_{\kappa}, c)
+\textbf{appappk}(v_f,\_, \_, c)
 \leadsto
 E\langle
 e_b , \rho'_{\lambda} , c , u
@@ -656,7 +656,7 @@ u &\triangleq tick(\varsigma, 1) \\
 
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{appk}(done, [\;], \rho_{\kappa}, c)
+\textbf{appk}(done, [\;], \_, c)
 \leadsto
 E\langle
 e_b , \rho'_{\lambda} , c , u
@@ -674,7 +674,7 @@ v'_s &\triangleq v_s \mdoubleplus [v] \\
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \[
-\textbf{appk}(done, [\;], \rho_{\kappa}, c)
+\textbf{appk}(done, [\;], \_, c)
 \leadsto
 E\langle
 e_b , \rho'_{\lambda} , c , u
