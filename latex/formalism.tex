@@ -43,7 +43,7 @@
 % textsf for syntactic domains
 % textit for semantic domains
 % \maketitle
-\section{Concrete Semantics of Scheme CESK*}
+\section{Concrete Semantics of Scheme CESKt*}
 
 \small{
 \begin{multicols*}{2}
@@ -171,7 +171,7 @@ t,u \in \textit{Time} &\triangleq \mathbb{N} \\
         &|\; \textbf{appprimk}(op, \rho, a) \\
         &|\; \textbf{primk}(op, done, todo, \\
         &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\rho, a) \\
-        &|\; \textbf{letk}(vars, done, todo \\
+        &|\; \textbf{letk}(vars, done, todo, \\
         &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;e, \rho, a) \\
 %%%%%%%%%%%%%%%%%%%%%%%%% OTHER VARIABLES %%%%%%%%%%%%%%%%%%%%%%%%%
 %%% done/todo variables
@@ -221,20 +221,16 @@ u &\triangleq tick(\varsigma, 1) \\
 \sigma[b] &\triangleq \textbf{ifk}(e_t, e_f, \rho, a)
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION NO ARGSVALS %%%%%%%%%%%%%%%%%%%
-\vspace{-5mm}
+\vspace{-7mm}
 \[
 E\langle
 (\texttt{let}\;()\;e) , \rho , a , t
 \rangle
 \leadsto
 E\langle
-e , \rho , a , u
+e , \rho , a , t
 \rangle
 \]
-\vspace{-12mm}
-\begin{align*}
-\text{where } u &\triangleq tick(\varsigma, 1)
-\end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION VALS GOT ARGS %%%%%%%%%%%%%%%
 \vspace{-5mm}
 \[
@@ -727,32 +723,63 @@ u &\triangleq tick(\varsigma, 1) \\
 
 
 \newpage
-\section{Abstract Semantics of Scheme CESK*}
+\section{Abstract Semantics of Scheme CESKt*}
+
+\begin{multicols*}{2}
+  \begin{center}
+    \textbf{Tick/Alloc:}
+  \end{center}
+  \vspace{-8mm}
+\begin{align*}
+  \widehat{tick} :  \hat{\Sigma} &\times \textit{Kont} \rightarrow \textit{Time} \\
+  \widehat{tick}(\hat{\varsigma}, \kappa) &\triangleq 0 \\
+  \widehat{alloc} : \hat{\Sigma} &\times \textit{Kont} \rightarrow \textit{Addr} \\
+  \widehat{alloc}(\hat{\varsigma}, \kappa) &\triangleq 0 \\
+\end{align*}
+\end{multicols*}
 
 
 
+\newpage
+
+\begin{multicols*}{2}
+[
+\begin{center}
+\textbf{Eval Rules} \\
+\end{center}
+]
+
+%%%%%%%%%%%%%%%%%%%%%%%%% IF EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
+\[
+  E\langle
+  \ifsyn{e_c}{e_t}{e_f} , \rho , a , t
+  \rangle
+  \leadsto
+  E\langle
+  e_c , \rho , b , u
+  \rangle
+\]
+\vspace{-13mm}
+\begin{align*}
+  \text{where } b &\triangleq alloc(\varsigma, 0) \\
+  u &\triangleq tick(\varsigma, 1) \\
+  \sigma[b] &\sqcup \textbf{ifk}(e_t, e_f, \rho, a)
+\end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION NO ARGSVALS %%%%%%%%%%%%%%%%%%%
+\vspace{-5mm}
+\[
+  E\langle
+  (\texttt{let}\;()\;e) , \rho , a , t
+  \rangle
+  \leadsto
+  E\langle
+  e , \rho , a , t
+  \rangle
+\]
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+\end{multicols*}
 
 
 
