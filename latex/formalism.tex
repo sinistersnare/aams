@@ -159,9 +159,9 @@ v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} + \mathbb{Z} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%
 clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ADDRESSES %%%%%%%%%%%%%%%%%%%%%%%%%
-a,b,c \in \textit{Addr} &\triangleq \mathbb{N} \\
+a, a_\kappa \in \textit{Addr} &\triangleq \mathbb{N} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% TIME %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-t,u \in \textit{Time} &\triangleq \mathbb{N} \\
+t \in \textit{Time} &\triangleq \mathbb{N} \\
 %%%%%%%%%%%%%%%%%%%%%%%%% KONTINUATIONS %%%%%%%%%%%%%%%%%%%%%%%%%
 \kappa \in \textit{Kont} &::= \textbf{mt} \\
         &|\; \textbf{ifk}(e, e, \rho, a) \\
@@ -190,17 +190,17 @@ vars &\triangleq \textsf{Var}^*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpage
-
+\footnotesize{
 \begin{multicols*}{2}
 [
 \begin{center}
 \textbf{Eval Rules} \\
 Rules for when the control is an expression \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%
-\vspace{10mm}
-$E\langle \mae , \rho , \sigma , \sigma_\kappa , a , t \rangle
+\vspace{3mm}
+$E\langle \mae , \rho , \sigma , \sigma_\kappa , a_\kappa , t \rangle
 \leadsto
-A\langle v , \sigma , \sigma_\kappa , a , t \rangle$ \\
+A\langle v , \sigma , \sigma_\kappa , a_\kappa , t \rangle$ \\
 where $v \triangleq \mathcal{A}(\varsigma)$
 \end{center}
 ]
@@ -219,19 +219,20 @@ where $v \triangleq \mathcal{A}(\varsigma)$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION NO ARGSVALS %%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $E\langle (\texttt{let}\;()\;e) , \rho , \sigma , \sigma_\kappa , a , t \rangle$
-  $\leadsto E\langle e , \rho , \sigma , \sigma_\kappa , a , t \rangle$
+  $E\langle (\texttt{let}\;()\;e) , \rho , \sigma,\sigma_\kappa,a_\kappa , t \rangle$
+  $\leadsto E\langle e , \rho , \sigma , \sigma_\kappa , a_\kappa , t \rangle$
 \end{center}
+\vspace{-3mm}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION VALS GOT ARGS %%%%%%%%%%%%%%%
 \begin{center}
-  $E\langle
-  (\texttt{let}\;([x_0\;e_0]\;[x_s\;e_s]\;...)\;e_b),$
-  $\rho , \sigma , \sigma_\kappa , a_\kappa , t \rangle
-   \leadsto E\langle e_0 , \rho , \sigma , \sigma'_\kappa , a'_\kappa , t' \rangle$
+  $E\langle (\texttt{let}\;bs\;e_b), \rho , \sigma , \sigma_\kappa , a_\kappa , t \rangle$
+   $\leadsto E\langle e_0 , \rho , \sigma , \sigma'_\kappa , a'_\kappa , t' \rangle$
 \end{center}
 \vspace{-5mm}
 \begin{align*}
-  \text{where } a'_\kappa &\triangleq alloc(\varsigma, 0) \\
+  \text{where }
+  bs &= ([x_0\;e_0]\;[x_s\;e_s]\;...) \\
+  a'_\kappa &\triangleq alloc(\varsigma, 0) \\
   t' &\triangleq tick(\varsigma, 1) \\
   \kappa &\triangleq \textbf{letk}(x_0::x_s, [\;], e_s, e_b, \rho, a_\kappa) \\
   \sigma'_\kappa &\triangleq \sigma_\kappa[a'_\kappa \mapsto \kappa]
@@ -259,7 +260,8 @@ where $v \triangleq \mathcal{A}(\varsigma)$
   \text{where }
   a'_\kappa &\triangleq alloc(\varsigma, 0) \\
   t' &\triangleq tick(\varsigma, 1) \\
-  \kappa &\triangleq \textbf{setk}(x, a_\kappa) \\
+  a &\triangleq \rho(x) \\
+  \kappa &\triangleq \textbf{setk}(a, a_\kappa) \\
   \sigma'_\kappa &\triangleq \sigma_\kappa[a'_\kappa \mapsto \kappa]
 \end{align*}
 
@@ -324,7 +326,7 @@ where $v \triangleq \mathcal{A}(\varsigma)$
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION EXPRESSION %%%%%%%%%%%%%%%%
 \begin{center}
   $E\langle (e_f\;e_s\;...) , \rho , \sigma , \sigma_\kappa , a_\kappa , t \rangle$
-  $\leadsto E\langle e_f , \rho , \sigma , \sigma_\kappa , a'_\kappa , t' \rangle$
+  $\leadsto E\langle e_f , \rho , \sigma , \sigma'_\kappa , a'_\kappa , t' \rangle$
 \end{center}
 \vspace{-5mm}
 \begin{align*}
@@ -335,7 +337,7 @@ where $v \triangleq \mathcal{A}(\varsigma)$
   \sigma'_\kappa &\triangleq \sigma_\kappa[a'_\kappa \mapsto \kappa]
 \end{align*}
 \end{multicols*}
-
+} % footnotesize
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -388,9 +390,9 @@ $\textbf{mt} \leadsto \varsigma$
 \begin{align*}
   \text{where } a_i &\triangleq alloc(\varsigma, i) \\
   t' &\triangleq tick(\varsigma, n) \\
+  done' &\triangleq done \mdoubleplus [v] \\
   \rho'_{\kappa} &\triangleq \rho_{\kappa}[vars_0 \mapsto a_0\;...\\
                     &\;\;\;\;\;\;\;\;\;\;  vars_{n-1} \mapsto a_{n-1}] \\
-  done' &\triangleq done \mdoubleplus [v] \\
   \sigma' &\triangleq \sigma[a_0 \mapsto done'_0\;...\\
                     &\;\;\;\;\;\;\;\;a_{n-1} \mapsto done'_{n-1}]
 \end{align*}
@@ -410,12 +412,12 @@ $\textbf{mt} \leadsto \varsigma$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{setk}(x, \rho_\kappa, a'_\kappa)$
+  $\textbf{setk}(a, a'_\kappa)$
   $\leadsto A\langle \textit{Void} , \sigma' , \sigma_\kappa , a'_\kappa , t \rangle$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
-  \text{where } \sigma' &\triangleq \sigma[\rho_{\kappa}(x) \mapsto v]
+  \text{where } \sigma' &\triangleq \sigma[a \mapsto v]
 \end{align*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -431,7 +433,7 @@ $\textbf{mt} \leadsto \varsigma$
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC MULTIARG KONT %%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\textbf{callcck}(a'_\kappa)$
-  $\leadsto E\langle e , \rho'_\lambda , \sigma , \sigma_\kappa , a'_\kappa , t \rangle$
+  $\leadsto E\langle e , \rho'_\lambda , \sigma' , \sigma_\kappa , a'_\kappa , t \rangle$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -613,7 +615,7 @@ Rules for when the control is a value
   a''_\kappa &\triangleq alloc(\varsigma, 0) \\
   t' &\triangleq tick(\varsigma, 1) \\
   \kappa' &\triangleq \textbf{appk}(done \mdoubleplus [v] , e_t , \rho_\kappa , a'_\kappa) \\
-  \sigma'_\kappa &\triangleq \sigma[a''_\kappa \mapsto \kappa']
+  \sigma'_\kappa &\triangleq \sigma_\kappa[a''_\kappa \mapsto \kappa']
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% ITS OVER %%%%%%%%%%%%%%%%%%%%%%%%%
 \end{multicols*}

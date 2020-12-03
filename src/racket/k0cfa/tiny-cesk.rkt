@@ -8,8 +8,8 @@
 ;
 ; eval will evaluate expressions
 ; apply will apply values to produce the next state.
-(struct E (sexpr env nextkaddr time) #:transparent)
-(struct A (val env nextkaddr time) #:transparent)
+(struct E (sexpr env store kstore nextkaddr time) #:transparent)
+(struct A (val store kstore nextkaddr time) #:transparent)
 
 (struct addr (n) #:transparent)
 (struct time (t) #:transparent)
@@ -19,14 +19,14 @@
 
 (struct ktype () #:transparent) ; super-type for continuation frames
 (struct mtk ktype () #:transparent)
-(struct ifk ktype (et ef env a) #:transparent)
-(struct callcck ktype (env a) #:transparent)
-(struct setk ktype (x env a) #:transparent)
-(struct appappk ktype (mval e env a) #:transparent)
-(struct appk ktype (done todo env a) #:transparent)
-(struct appprimk ktype (op env a) #:transparent)
-(struct primk ktype (op done todo env a) #:transparent)
-(struct letk ktype (vars done todo e env a) #:transparent)
+(struct ifk ktype (et ef env kaddr) #:transparent)
+(struct callcck ktype (kaddr) #:transparent)
+(struct setk ktype (a kaddr) #:transparent)
+(struct appappk ktype (mval e env kaddr) #:transparent)
+(struct appk ktype (done todo env kaddr) #:transparent)
+(struct appprimk ktype (op env kaddr) #:transparent)
+(struct primk ktype (op done todo env kaddr) #:transparent)
+(struct letk ktype (vars done todo e env kaddr) #:transparent)
 
 (define prims
   (hash '+ (prim +)
@@ -36,7 +36,10 @@
         'boolean? (prim boolean?)
         'continuation? (prim ktype?)
         'list (prim list)
-        'cons (prim cons) 'car (prim car) 'cdr (prim cdr) 'null (prim (λ () null))))
+        'cons (prim cons)
+        'car (prim car)
+        'cdr (prim cdr)
+        'null (prim (λ () null))))
 
 (define (lambda-start? s)
   (match s
@@ -59,190 +62,199 @@
          `(quote ,_)) #t]
     [else #f]))
 
-; global store, default value contains the mt kont.
-(define store (make-hash (list (cons (addr 0) (mtk)))))
-; adds a value to the store, returns the address of that value.
-(define (add-to-store! a v)
-  (hash-set! store a v))
-(define (get-from-store a)
-  (hash-ref store a))
-(define (reset-store!)
-  (set! store (make-hash (list (cons (addr 0) (mtk))))))
+(define (atomic-eval st)
+  (match-define (E sexpr p store _ _ _) st)
+  (match sexpr
+    [(? lambda?) (closure sexpr p)]
+    [`(quote ,e) (quoteobj e)]
+    [(or (? number?) (? boolean?)) sexpr]
+    [(? symbol?) (hash-ref store (hash-ref p sexpr))]))
 
+; just a helper function for updating a lot of keys at once
+; to be used in a fold
+(define update-hash (λ (k v res) (hash-set res k v)))
 
 (define (alloc st offset)
   (match st
-    [(E _ _ _ (time t)) (addr (+ t offset))]
-    [(A _ _ _ (time t)) (addr (+ t offset))]))
+    [(E _ _ _ _ _ (time t)) (addr (+ t offset))]
+    [(A _ _ _ _ (time t)) (addr (+ t offset))]))
 
 (define (tick st amt)
   (match st
-    [(E _ _ _ (time t)) (time (+ t amt))]
-    [(A _ _ _ (time t)) (time (+ t amt))]))
+    [(E _ _ _ _ _ (time t)) (time (+ t amt))]
+    [(A _ _ _ _ (time t)) (time (+ t amt))]))
+
+(define (apply-step st)
+  (match-define (A v store kstore kaddr t) st)
+  (define k (hash-ref kstore kaddr))
+  (match k
+    [(mtk) st]
+    [(ifk _ ef pk next-kaddr)
+     #:when (equal? v #f)
+     (E ef pk store kstore next-kaddr t)]
+    [(ifk et _ pk next-kaddr)
+     #:when (not (equal? v #f))
+     (E et pk store kstore next-kaddr t)]
+    [(letk vars not-done '() eb pk next-kaddr)
+     (define as (map (λ (i) (alloc st i)) (range (length vars))))
+     (define next-t (tick st (length vars)))
+     (define done (append not-done (list v)))
+     (define next-pk (foldl update-hash pk vars as))
+     (define next-store (foldl update-hash store as done))
+     (E eb next-pk next-store kstore next-kaddr next-t)]
+    [(letk vars not-done (cons eh et) eb pk next-kaddr)
+     (define next-next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-k (letk vars (append not-done (list v)) et eb pk next-kaddr))
+     (define next-kstore (hash-set kstore next-next-kaddr next-k))
+     (E eh pk store next-kstore next-next-kaddr next-t)]
+    [(setk a next-kaddr)
+     (define next-store (hash-set store a v))
+     (A (void) next-store kstore next-kaddr t)]
+    [(callcck next-kaddr)
+     #:when (closure? v)
+     (match-define (closure `(,(? lambda-start?) (,x) ,e) plam) v)
+     (define a (alloc st 0))
+     (define next-t (tick st 1))
+     ; reify next-kaddr and put into store
+     (define next-k (hash-ref kstore next-kaddr))
+     (define next-plam (hash-set plam x a))
+     (define next-store (hash-set store a next-k))
+     (E e next-plam next-store kstore next-kaddr t)]
+    [(callcck _)
+     #:when (ktype? v)
+     (define next-k v)
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-kstore (hash-set kstore next-kaddr next-k))
+     (A k store next-kstore next-kaddr next-t)]
+    [(appprimk (prim op) pk next-kaddr)
+     (define next-v (apply op v))
+     (A next-v store kstore next-kaddr t)]
+    [(primk (prim op) not-done '() pk next-kaddr)
+     (define next-v (apply op (append not-done (list v))))
+     (A next-v store kstore next-kaddr t)]
+    [(primk op done (cons eh et) pk next-kaddr)
+     (define next-next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-k (primk op (append done (list v)) et pk next-kaddr))
+     (define next-kstore (hash-set kstore next-next-kaddr next-k))
+     (E eh pk store next-kstore next-next-kaddr next-t)]
+    [(appappk (closure `(,(? lambda-start?) (,xs ...) ,eb) plam) _ _ next-kaddr)
+     (define as (map (λ (i) (alloc st i)) (range (length xs))))
+     (define next-t (tick st (length xs)))
+     (define next-plam (foldl update-hash plam xs as))
+     (define next-store (foldl update-hash store as v))
+     (E eb next-plam next-store kstore next-kaddr next-t)]
+    [(appappk (closure `(,(? lambda-start?) ,(? symbol? x) ,eb) plam)
+              _ _ next-kaddr)
+     (define a (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-plam (hash-set plam x a))
+     (define next-store (hash-set store a v))
+     (E eb next-plam next-store kstore next-kaddr next-t)]
+    [(appappk '() e pk next-kaddr)
+     (define next-next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-k (appappk v e pk next-kaddr))
+     (define next-kstore (hash-set kstore next-next-kaddr next-k))
+     (E e pk store next-kstore next-next-kaddr next-t)]
+    [(appk (cons (closure `(,(? lambda-start?) (,xs ...) ,eb) plam) notdone-vs)
+           '() _ next-kaddr)
+     (define as (map (λ (i) (alloc st i)) (range (length xs))))
+     (define next-t (tick st (length xs)))
+     (define vs (append notdone-vs (list v)))
+     (define next-plam (foldl update-hash plam xs as))
+     (define next-store (foldl update-hash store as vs))
+     (E eb next-plam next-store kstore next-kaddr next-t)]
+    [(appk (cons (closure `(,(? lambda-start?) ,(? symbol? x) ,eb) plam) notdone-vs)
+           '() _ next-kaddr)
+     (define a (alloc st 0))
+     (define next-t (tick st 1))
+     (define vs (append notdone-vs (list v)))
+     (define next-plam (hash-set plam x a))
+     (define next-store (hash-set store a vs))
+     (E eb next-plam next-store kstore next-kaddr next-t)]
+    [(appk (list (? ktype? klam)) '() pk next-kaddr)
+     (define next-next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-kstore (hash-set kstore next-next-kaddr klam))
+     (A v store next-kstore next-next-kaddr next-t)]
+    [(appk done (cons eh et) pk next-kaddr)
+     (define next-next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define next-k (appk (append done (list v)) et pk next-kaddr))
+     (define next-kstore (hash-set kstore next-next-kaddr next-k))
+     (E eh pk store next-kstore next-next-kaddr next-t)]))
 
 (define (eval-step st)
-  (match-define (E sexpr p a t) st)
-  ; evalutes atomic expressions so they can be applied.
-  ; call only when (atomic? sexpr).
-  (define (atomic-eval)
-    (match sexpr
-      [(? lambda?) (closure sexpr p)]
-      [`(quote ,e) (quoteobj e)]
-      [(or (? number?) (? boolean?)) sexpr]
-      [(? symbol?) (get-from-store (hash-ref p sexpr))]))
-  ; actual transitions
-  (match sexpr
+  (match-define (E ctrl p store kstore kaddr t) st)
+  (match ctrl
     [(? atomic?)
-     (define v (atomic-eval))
-     (A v p a t)]
+     (define v (atomic-eval st))
+     (A v store kstore kaddr t)]
     [`(if ,ec ,et ,ef)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (ifk et ef p a))
-     (E ec p b u)]
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (ifk et ef p kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E ec p store next-kstore next-kaddr next-t)]
     [`(let () ,e)
-     (define u (tick st 1))
-     (E e p a u)]
+     (E e p store kstore kaddr t)]
     [`(let ([,x0 ,e0] [,xs ,es] ...) ,eb)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (letk (cons x0 xs) '() es eb p a))
-     (E e0 p b u)]
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (letk (cons x0 xs) '() es eb p kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E e0 p store next-kstore next-kaddr next-t)]
     [`(call/cc ,e)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (callcck p a))
-     (E e p b u)]
-    [`(set! ,x ,e)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (setk x a))
-     (E e p b u)]
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (callcck kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E e p store next-kstore next-kaddr next-t)]
+    [`(set! ,(? symbol? x) ,e)
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define a (hash-ref p x))
+     (define k (setk a kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E e p store next-kstore next-kaddr next-t)]
     [`(prim ,op)
      (match-define (prim pf) (hash-ref prims op))
      (define v (apply pf '()))
-     (A v p a t)]
+     (A v store kstore kaddr t)]
     [`(prim ,op ,e0 ,es ...)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (primk (hash-ref prims op) '() es p a))
-     (E e0 p b u)]
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (primk (hash-ref prims op) '() es p kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E e0 p store next-kstore next-kaddr next-t)]
     [`(apply-prim ,op ,e)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (appprimk (hash-ref prims op) p a))
-     (E e p b u)]
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (appprimk (hash-ref prims op) p kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E e p store next-kstore next-kaddr next-t)]
     [`(apply ,ef ,ex)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (appappk '() ex p a))
-     (E ef p b u)]
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (appappk '() ex p kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E ef p store next-kstore next-kaddr next-t)]
     [`(,ef ,es ...)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (appk '() es p a))
-     (E ef p b u)]))
+     (define next-kaddr (alloc st 0))
+     (define next-t (tick st 1))
+     (define k (appk '() es p kaddr))
+     (define next-kstore (hash-set kstore next-kaddr k))
+     (E ef p store next-kstore next-kaddr next-t)]))
 
-(define (apply-step st)
-  (match-define (A v p a t) st)
-  (define k (get-from-store a))
-  (match k
-    [(mtk) st]
-    [(ifk et ef p c)
-     #:when (equal? v #f)
-     (E ef p c t)]
-    [(ifk et ef p c)
-     #:when (not (equal? v #f))
-     (E et p c t)]
-    [(letk vars done '() eb pk c)
-     (define bs (map (λ (i) (alloc st i)) (range (length vars))))
-     (define u (tick st (length vars)))
-     (define doneprime (append done (list v)))
-     (define pkprime
-       (foldl (λ (k v res) (hash-set res k v)) pk vars bs))
-     (foldl (λ (k v _) (add-to-store! k v)) (void) bs doneprime)
-     (E eb pkprime c u)]
-    [(letk vars done (cons eh et) eb pk c)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (letk vars (append done (list v)) et eb pk c))
-     (E eh pk b u)]
-    [(callcck _ c)
-     #:when (closure? v)
-     (match-define (closure `(,(? lambda-start?) (,x) ,e) plam) v)
-     (define plamprime (hash-set plam x c))
-     (E e plamprime c t)]
-    [(callcck pprime _)
-     #:when (ktype? v)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b v)
-     (A k pprime b u)]
-    [(setk x pk c)
-     (add-to-store! (hash-ref pk x) v)
-     (A (void) pk c t)]
-    [(appprimk (prim op) pk c)
-     (define vprime (apply op v))
-     (A vprime pk c t)]
-    [(primk (prim op) done '() pk c)
-     (define vprime (apply op (append done (list v))))
-     (A vprime pk c t)]
-    [(primk op done (cons eh et) pk c)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (primk op (append done (list v)) et pk c))
-     (E eh pk b u)]
-    [(appappk '() e pk  c)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (appappk v e pk c))
-     (E e pk b u)]
-    [(appappk (closure `(,(? lambda-start?) (,xs ...) ,eb) plam) _ _ c)
-     (define bs (map (λ (i) (alloc st i)) (range (length xs))))
-     (define u (tick st (length xs)))
-     (define plamprime (foldl (λ (k v res) (hash-set res k v)) plam xs bs))
-     (foldl (λ (k v _) (add-to-store! k v)) (void) bs v)
-     (E eb plamprime c u)]
-    [(appappk (closure `(,(? lambda-start?) ,x ,eb) plam) _ _ c)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (define plamprime (hash-set plam x b))
-     (add-to-store! b v)
-     (E eb plamprime)]
-    [(appk (cons (closure `(,(? lambda-start?) (,xs ...) ,eb) plam)  vs) '() _ c)
-     (define bs (map (λ (i) (alloc st i)) (range (length xs))))
-     (define u (tick st (length xs)))
-     (define plamprime (foldl (λ (k v res) (hash-set res k v)) plam xs bs))
-     (define vsprime (append vs (list v)))
-     (foldl (λ (k v _) (add-to-store! k v)) (void) bs vsprime)
-     (E eb plamprime c u)]
-    [(appk (cons (closure `(,(? lambda-start?) ,x ,eb) plam) vs) '() _ c)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (define plamprime (hash-set plam x b))
-     (define vsprime (append vs (list v)))
-     (add-to-store! b vsprime)
-     (E eb plamprime c u)]
-    [(appk (list (? ktype? klam)) '() pk _)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b klam)
-     (A v pk b u)]
-    [(appk done (cons eh et) pk c)
-     (define b (alloc st 0))
-     (define u (tick st 1))
-     (add-to-store! b (appk (append done (list v)) et pk c))
-     (E eh pk b u)]))
 
 ; forms an initial state from an expression
-(define (inject e) (E e (hash) (addr 0) (time 1)))
-
-(define (fix? st0 st1)
-  (equal? st0 st1))
-
+(define (inject e) (E e (hash) (hash) (hash (addr 0) (mtk)) (addr 0) (time 1)))
+(define fix? equal?)
 ; iterates an initial state until fixpoint
 (define (evaluate program)
-  (reset-store!)
   (define state0 (inject program))
   (define (run st)
     (define nextst (match st
@@ -252,12 +264,3 @@
   (run state0))
 
 (define e evaluate)
-
-
-
-
-
-
-
-
-
