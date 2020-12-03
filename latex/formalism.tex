@@ -436,8 +436,8 @@ $\textbf{mt} \leadsto \varsigma$
 \vspace{-7mm}
 \begin{align*}
   \text{where } v &= (\singlelamsyn{x}{e} , \rho_{\lambda}) \\
-  a &\triangleq tick(\varsigma, 0) \\
-  t' &\triangleq alloc(\varsigma, 1) \\
+  a &\triangleq alloc(\varsigma, 0) \\
+  t' &\triangleq tick(\varsigma, 1) \\
   \kappa' &\triangleq \sigma_\kappa(a'_\kappa) \\
   \rho'_{\lambda} &\triangleq \rho_{\lambda}[x \mapsto a] \\
   \sigma' &\triangleq \sigma[a \mapsto \kappa']
@@ -703,7 +703,7 @@ Rules for when the control is a value
     \hat{\kappa} \in \widehat{\textit{Kont}} &::= \textbf{mt} \\
     &|\; \textbf{ifk}(e, e, \hat{\rho}, \hat{a}_{\hat{\kappa}}) \\
     &|\; \textbf{callcck}(\hat{a}_{\hat\kappa}) \\
-    &|\; \textbf{setk}(x, \hat{\rho}, \hat{a}_{\hat{\kappa}}) \\
+    &|\; \textbf{setk}(\hat{a}, \hat{a}_{\hat{\kappa}}) \\
     &|\; \textbf{appappk}(\widehat{val}?, e, \hat{\rho}, \hat{a}_{\hat\kappa}) \\
     &|\; \textbf{appk}(\widehat{done}, todo, \hat{\rho}, \hat{a}_{\hat\kappa}) \\
     &|\; \textbf{appprimk}(op, \hat{\rho}, \hat{a}_{\hat\kappa}) \\
@@ -755,7 +755,7 @@ where $\hat{v} \triangleq \hat{\mathcal{A}}(\hat{\varsigma}, \hat{\sigma})$ \\
   $E\langle \ifsyn{e_c}{e_t}{e_f} , \hat{\rho} , \hat{\sigma} , \hat{\sigma}_{\hat{\kappa}} , \hat{a}_{\hat{\kappa}} , \hat{t}\,\rangle$
   $\leadsto E\langle e_c , \hat{\rho} , \hat{\sigma} , \hat{\sigma}'_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}'\rangle$
 \end{center}
-\vspace{-6mm}
+\vspace{-3mm}
 \begin{align*}
   \text{where } \hat{a}'_{\hat{\kappa}} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
   \hat{t}' &\triangleq \widehat{tick}(\hat{\varsigma}, 1, \hat{\kappa}) \\
@@ -770,13 +770,14 @@ where $\hat{v} \triangleq \hat{\mathcal{A}}(\hat{\varsigma}, \hat{\sigma})$ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION VALS GOT ARGS %%%%%%%%%%%%%%%
 \begin{center}
   $E\langle
-  (\texttt{let}\;([x_0\;e_0]\;[x_s\;e_s]\;...)\;e_b),$
-  $\hat{\rho}  , \hat{\sigma} , \hat{\sigma}_{\hat{\kappa}} , \hat{a}_{\hat{\kappa}} , \hat{t}\,\rangle
-  \leadsto E\langle e_0 , \hat{\rho}  , \hat{\sigma} , \hat{\sigma}'_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}'\rangle$
+  (\texttt{let}\;bnds\;e_b), \hat{\rho}  , \hat{\sigma} , \hat{\sigma}_{\hat{\kappa}} , \hat{a}_{\hat{\kappa}} , \hat{t}\,\rangle$
+  $\leadsto E\langle e_0 , \hat{\rho}  , \hat{\sigma} , \hat{\sigma}'_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}'\rangle$
 \end{center}
-\vspace{-6mm}
+\vspace{-4mm}
 \begin{align*}
-  \text{where } \hat{a}'_{\hat{\kappa}} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
+  \text{where }
+  bnds &= ([x_0\;e_0]\;[x_s\;e_s]\;...) \\
+  \hat{a}'_{\hat{\kappa}} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
   \hat{t}' &\triangleq \widehat{tick}(\hat{\varsigma}, 1, \hat{\kappa}) \\
   \hat{\kappa} &\triangleq \textbf{letk}(x_0::x_s, [\;], e_s, e_b, \hat{\rho}, \hat{a}_{\hat{\kappa}}) \\
   \hat{\sigma}'_{\hat{\kappa}} &\triangleq \hat{\sigma}_{\hat{\kappa}} \sqcup [\hat{a}'_{\hat{\kappa}} \mapsto \hat{\kappa}]
@@ -802,7 +803,8 @@ where $\hat{v} \triangleq \hat{\mathcal{A}}(\hat{\varsigma}, \hat{\sigma})$ \\
 \begin{align*}
   \text{where } \hat{a}'_{\hat{\kappa}} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
   \hat{t}' &\triangleq \widehat{tick}(\hat{\varsigma}, 1, \hat{\kappa}) \\
-  \hat{\kappa} &\triangleq \textbf{setk}(x, a) \\
+  \hat{a} &\triangleq \hat{\rho}(x) \\
+  \hat{\kappa} &\triangleq \textbf{setk}(\hat{a}, \hat{a}_{\hat\kappa}) \\
   \hat{\sigma}'_{\hat{\kappa}} &\triangleq \hat{\sigma}_{\hat{\kappa}} \sqcup [\hat{a}'_{\hat{\kappa}} \mapsto \hat{\kappa}]
 \end{align*}
 
@@ -890,8 +892,8 @@ where $\hat{v} \triangleq \hat{\mathcal{A}}(\hat{\varsigma}, \hat{\sigma})$ \\
 \textbf{Apply Rules} \\
 Rules for when the control is a value \\
 $\hat{\varsigma} = A\langle \hat{v} , \hat{\sigma} , \hat{\sigma}_{\hat{\kappa}} , \hat{a}_{\hat{\kappa}} , \hat{t} \rangle$ \\
-$\kappa \in \hat{\sigma}_{\hat{\kappa}}(\hat{a}_{\hat{\kappa}})$ \\
-Proceed by matching on $\kappa$ \\
+$\hat{\kappa} \in \hat{\sigma}_{\hat{\kappa}}(\hat{a}_{\hat{\kappa}})$ \\
+Proceed by matching on $\hat{\kappa}$ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% EMPTY KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{5mm}
 $\textbf{mt} \leadsto \hat{\varsigma}$
@@ -967,13 +969,17 @@ $\textbf{mt} \leadsto \hat{\varsigma}$
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC MULTIARG KONT %%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\textbf{callcck}(\hat{a}'_{\hat{\kappa}})$
-  $\leadsto E\langle e , \hat{\rho}'_{\hat{\lambda}} , \hat{\sigma} , \hat{\sigma}_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}\,\rangle$
+  $\leadsto E\langle e , \hat{\rho}'_{\lambda} , \hat{\sigma}' , \hat{\sigma}_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}\,\rangle$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
-  \text{THIS IS BROKEN,}&\text{see concrete version} \\
-  \text{where } \hat{v} &= (\singlelamsyn{x}{e} , \hat{\rho}_{\hat{\lambda}}) \\
-  \hat{\rho}'_{\hat{\lambda}} &\triangleq \hat{\rho}_{\hat{\lambda}}[x \mapsto \hat{a}'_{\hat{\kappa}}]
+  \text{where }
+  \hat{v} &= (\singlelamsyn{x}{e} , \hat{\rho}_{\lambda}) \\
+  \hat{a} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
+  \hat{t}' &\triangleq \widehat{tick}(\hat{\varsigma}, 1, \hat{\kappa}) \\
+  \hat{\kappa}' &\triangleq \hat{\sigma}_{\hat{\kappa}}(\hat{a}'_{\hat{\kappa}}) \\
+  \hat{\rho}'_{\lambda} &\triangleq \hat{\rho}_{\lambda}[x \mapsto \hat{a}] \\
+  \hat{\sigma}' &\triangleq \hat{\sigma} \sqcup [\hat{a} \mapsto \hat{\kappa}']
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}

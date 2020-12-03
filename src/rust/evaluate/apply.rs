@@ -175,11 +175,7 @@ fn handle_set_bang_kont(k: Kont, st: &ValState) -> State {
       time,
       ..
    } = st.clone();
-   if let Kont::Set(var, setenv, next_kaddr) = k {
-      let addr = match setenv.get(&var) {
-         Some(v) => v,
-         None => panic!("{:?} was not defined.", var),
-      };
+   if let Kont::Set(addr, next_kaddr) = k {
       let next_store = store.insert(addr, val);
       State::Apply(ValState::new(
          Val::Void,

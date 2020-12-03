@@ -61,10 +61,10 @@ on it. This is a a stretch goal, but I think its doable!
 * Its probably better for the `setk` continuation to take the address outright,
 instead of figuring out the address later. Thats what AAM does... And AAM == right.
 	* This would mean changes in all implementations and the formalizations!
-	* I think after that, we could remove the `\rho` from the continuation.
+	* Done in Rust, now impl in Formalization! Then Racket!
 * appprimk does not need an env arg.
 * Right now, continuations dont take value stores. Is there some weird behavior that can come about if a value is mutated with `set!` and then when its time to read the continuation, a wrong value is propogated?
-* In rust code, is it possible to rename `kont_addr` to just `kaddr`? Ensure regex search `[^_]kaddr` has 0 results.
+* In rust code, use a `KAddr` type for the KStore? Better typesafety.
 
 ## License ##
 
