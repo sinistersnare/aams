@@ -944,6 +944,15 @@ $\textbf{mt} \leadsto \hat{\varsigma}$
   &\;\;\;\;\;\;\;\;\;\;\;\;\;\, e_t , e_b , \hat{\rho}_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}}) \\
   \hat{\sigma}'_{\hat{\kappa}} &\triangleq \hat{\sigma}_{\hat{\kappa}} \sqcup [\hat{a}''_{\hat{\kappa}} \mapsto \hat{\kappa}']
 \end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{center}
+  $\textbf{setk}(x, \hat{\rho}_{\hat{\kappa}}, \hat{a}'_{\hat{\kappa}})$
+  $\leadsto A\langle \textit{Void} , \hat{\sigma}' , \hat{\sigma}_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}\,\rangle$
+\end{center}
+\vspace{-7mm}
+\begin{align*}
+  \text{where } \hat{\sigma}' &\triangleq \hat{\sigma} \sqcup [\hat{\rho}_{\hat{\kappa}}(x) \mapsto \hat{v}]
+\end{align*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% COLUMN BREAK %%%%%%
@@ -962,8 +971,9 @@ $\textbf{mt} \leadsto \hat{\varsigma}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
-\text{where } \hat{v} &= (\singlelamsyn{x}{e} , \hat{\rho}_{\hat{\lambda}}) \\
-\hat{\rho}'_{\hat{\lambda}} &\triangleq \hat{\rho}_{\hat{\lambda}}[x \mapsto \hat{a}'_{\hat{\kappa}}]
+  \text{THIS IS BROKEN,}&\text{see concrete version} \\
+  \text{where } \hat{v} &= (\singlelamsyn{x}{e} , \hat{\rho}_{\hat{\lambda}}) \\
+  \hat{\rho}'_{\hat{\lambda}} &\triangleq \hat{\rho}_{\hat{\lambda}}[x \mapsto \hat{a}'_{\hat{\kappa}}]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
@@ -976,15 +986,6 @@ $\textbf{mt} \leadsto \hat{\varsigma}$
   \hat{a}'_{\hat\kappa} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
   \hat{t}' &\triangleq \widehat{tick}(\hat{\varsigma}, 1, \hat{\kappa}) \\
   \hat{\sigma}'_{\hat{\kappa}} &\triangleq \hat{\sigma}_{\hat{\kappa}} \sqcup [\hat{a}'_{\hat{\kappa}} \mapsto \kappa']
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{setk}(x, \hat{\rho}_{\hat{\kappa}}, \hat{a}'_{\hat{\kappa}})$
-  $\leadsto A\langle \textit{Void} , \hat{\sigma}' , \hat{\sigma}_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}\,\rangle$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } \hat{\sigma}' &\triangleq \hat{\sigma} \sqcup [\hat{\rho}_{\hat{\kappa}}(x) \mapsto \hat{v}]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
