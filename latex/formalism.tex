@@ -408,6 +408,15 @@ $\textbf{mt} \leadsto \varsigma$
              &\;\;\;\;\;\;\;\;\;\;\;\;\;e_t, e_b, \rho_\kappa, a'_\kappa) \\
   \sigma'_\kappa &\triangleq \sigma_\kappa[a''_\kappa \mapsto \kappa']
 \end{align*}
+%%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{center}
+  $\textbf{setk}(x, \rho_\kappa, a'_\kappa)$
+  $\leadsto A\langle \textit{Void} , \sigma' , \sigma_\kappa , a'_\kappa , t \rangle$
+\end{center}
+\vspace{-7mm}
+\begin{align*}
+  \text{where } \sigma' &\triangleq \sigma[\rho_{\kappa}(x) \mapsto v]
+\end{align*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% COLUMN BREAK %%%%%%
@@ -445,15 +454,6 @@ $\textbf{mt} \leadsto \varsigma$
   a'_\kappa &\triangleq alloc(\varsigma, 0) \\
   t' &\triangleq tick(\varsigma, 1) \\
   \sigma'_\kappa &\triangleq \sigma_\kappa[a'_\kappa \mapsto \kappa']
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{setk}(x, \rho_\kappa, a'_\kappa)$
-  $\leadsto A\langle \textit{Void} , \sigma' , \sigma_\kappa , a'_\kappa , t \rangle$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } \sigma' &\triangleq \sigma[\rho_{\kappa}(x) \mapsto v]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}

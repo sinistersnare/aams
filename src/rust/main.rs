@@ -11,12 +11,12 @@ use std::env;
 use std::fs;
 
 mod common;
-mod eval;
+mod evaluate;
 mod prims;
 mod read;
 
 use crate::common::State;
-use crate::eval::evaluate;
+use crate::evaluate::evaluate;
 use crate::read::parse_expr;
 
 fn main() {
