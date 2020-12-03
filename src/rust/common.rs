@@ -69,7 +69,7 @@ pub enum Kont {
    Callcc(Addr),
    Set(Addr, Addr),
    Prim(Prim, Vec<Val>, Vec<SExpr>, Env, Addr),
-   ApplyPrim(Prim, Env, Addr),
+   ApplyPrim(Prim, Addr),
    ApplyList(Option<Box<Val>>, SExpr, Env, Addr),
    App(Vec<Val>, Vec<SExpr>, Env, Addr),
 }

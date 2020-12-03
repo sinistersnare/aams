@@ -169,7 +169,7 @@ t \in \textit{Time} &\triangleq \mathbb{N} \\
         &|\; \textbf{setk}(x, \rho, a) \\
         &|\; \textbf{appappk}(val?, e, \rho, a) \\
         &|\; \textbf{appk}(done, todo, \rho, a) \\
-        &|\; \textbf{appprimk}(op, \rho, a) \\
+        &|\; \textbf{appprimk}(op, a) \\
         &|\; \textbf{primk}(op, done, todo, \\
         &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\rho, a) \\
         &|\; \textbf{letk}(vars, done, todo, \\
@@ -307,7 +307,7 @@ where $v \triangleq \mathcal{A}(\varsigma)$
   \text{where }
   a'_\kappa &\triangleq alloc(\varsigma, 0) \\
   t' &\triangleq tick(\varsigma, 1) \\
-  \kappa &\triangleq \textbf{appprimk}(op, \rho, a_\kappa) \\
+  \kappa &\triangleq \textbf{appprimk}(op, a_\kappa) \\
   \sigma'_\kappa &\triangleq \sigma_\kappa[a'_\kappa \mapsto \kappa]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY FUNCTION LIST EXPRESSION %%%%%%%%%%%%%%%%
@@ -459,7 +459,7 @@ $\textbf{mt} \leadsto \varsigma$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appprimk}(op, \rho_\kappa, a'_\kappa)$
+  $\textbf{appprimk}(op, a'_\kappa)$
   $\leadsto A\langle v' , \sigma , \sigma_\kappa , a'_\kappa ,t) \rangle$
 \end{center}
 \vspace{-7mm}
@@ -708,7 +708,7 @@ Rules for when the control is a value
     &|\; \textbf{setk}(\hat{a}, \hat{a}_{\hat{\kappa}}) \\
     &|\; \textbf{appappk}(\widehat{val}?, e, \hat{\rho}, \hat{a}_{\hat\kappa}) \\
     &|\; \textbf{appk}(\widehat{done}, todo, \hat{\rho}, \hat{a}_{\hat\kappa}) \\
-    &|\; \textbf{appprimk}(op, \hat{\rho}, \hat{a}_{\hat\kappa}) \\
+    &|\; \textbf{appprimk}(op, \hat{a}_{\hat\kappa}) \\
     &|\; \textbf{primk}(op, \widehat{done}, todo, \\
     &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\hat{\rho}, \hat{a}_{\hat\kappa}) \\
     &|\; \textbf{letk}(vars, \widehat{done}, todo, \\
@@ -850,7 +850,7 @@ where $\hat{v} \triangleq \hat{\mathcal{A}}(\hat{\varsigma}, \hat{\sigma})$ \\
 \begin{align*}
   \text{where } \hat{a}'_{\hat{\kappa}} &\triangleq \widehat{alloc}(\hat{\varsigma}, 0, \hat{\kappa}) \\
   \hat{t}' &\triangleq \widehat{tick}(\hat{\varsigma}, 1, \hat{\kappa}) \\
-  \hat{\kappa} &\triangleq \textbf{appprimk}(op, \hat{\rho}, \hat{a}_{\hat{\kappa}}) \\
+  \hat{\kappa} &\triangleq \textbf{appprimk}(op, \hat{a}_{\hat{\kappa}}) \\
   \hat{\sigma}'_{\hat{\kappa}} &\triangleq \hat{\sigma}_{\hat{\kappa}} \sqcup [\hat{a}'_{\hat{\kappa}} \mapsto \hat{\kappa}]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY FUNCTION LIST EXPRESSION %%%%%%%%%%%%%%%%
@@ -997,7 +997,7 @@ $\textbf{mt} \leadsto \hat{\varsigma}$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appprimk}(op, \_, \hat{a}'_{\hat{\kappa}})$
+  $\textbf{appprimk}(op, \hat{a}'_{\hat{\kappa}})$
   $\leadsto A\langle \hat{v}' , \hat{\sigma} , \hat{\sigma}_{\hat{\kappa}} , \hat{a}'_{\hat{\kappa}} , \hat{t}\,\rangle$
 \end{center}
 \vspace{-7mm}

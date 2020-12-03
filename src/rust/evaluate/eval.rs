@@ -187,7 +187,7 @@ pub fn eval_step(st: &SExprState) -> State {
             } else if let Some((prim, listexpr)) = matches_apply_prim_expr(list) {
                let next_kaddr = st.alloc(0);
                let next_time = st.tick(1);
-               let next_k = Kont::ApplyPrim(prim, env.clone(), kaddr);
+               let next_k = Kont::ApplyPrim(prim, kaddr);
                let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
                State::Eval(SExprState::new(
                   listexpr,

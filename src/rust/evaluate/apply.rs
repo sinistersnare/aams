@@ -105,7 +105,7 @@ fn handle_apply_prim_kont(k: Kont, st: &ValState) -> State {
       time,
       ..
    } = st.clone();
-   if let Kont::ApplyPrim(op, _, next_kaddr) = k {
+   if let Kont::ApplyPrim(op, next_kaddr) = k {
       if !val_is_list(&val) {
          panic!("Apply not given a list.");
       }

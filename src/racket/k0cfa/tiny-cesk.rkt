@@ -24,7 +24,7 @@
 (struct setk ktype (a kaddr) #:transparent)
 (struct appappk ktype (mval e env kaddr) #:transparent)
 (struct appk ktype (done todo env kaddr) #:transparent)
-(struct appprimk ktype (op env kaddr) #:transparent)
+(struct appprimk ktype (op kaddr) #:transparent)
 (struct primk ktype (op done todo env kaddr) #:transparent)
 (struct letk ktype (vars done todo e env kaddr) #:transparent)
 
@@ -128,7 +128,7 @@
      (define next-t (tick st 1))
      (define next-kstore (hash-set kstore next-kaddr next-k))
      (A k store next-kstore next-kaddr next-t)]
-    [(appprimk (prim op) pk next-kaddr)
+    [(appprimk (prim op) next-kaddr)
      (define next-v (apply op v))
      (A next-v store kstore next-kaddr t)]
     [(primk (prim op) not-done '() pk next-kaddr)
@@ -233,7 +233,7 @@
     [`(apply-prim ,op ,e)
      (define next-kaddr (alloc st 0))
      (define next-t (tick st 1))
-     (define k (appprimk (hash-ref prims op) p kaddr))
+     (define k (appprimk (hash-ref prims op) kaddr))
      (define next-kstore (hash-set kstore next-kaddr k))
      (E e p store next-kstore next-kaddr next-t)]
     [`(apply ,ef ,ex)
