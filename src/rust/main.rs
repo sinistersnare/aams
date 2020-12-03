@@ -46,7 +46,7 @@ fn exec_string(program: &str) {
    let parsed = parse_expr(program.trim());
    match parsed {
       Ok((sexpr, _)) => {
-         let (states, _store) = evaluate(sexpr);
+         let states = evaluate(sexpr);
          let fin_state = states.last().unwrap();
          match fin_state {
             State::Eval(e) => panic!("Howd we end with eval? {:?}", e),

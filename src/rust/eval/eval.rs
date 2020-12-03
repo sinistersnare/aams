@@ -4,7 +4,7 @@
 //! To create a new state.
 
 use crate::common::{
-   Alloc, CloType, Closure, Kont, Prim, SExpr, SExprState, State, Store, Val, ValState, Var,
+   Alloc, CloType, Closure, Kont, Prim, SExpr, SExprState, State, Val, ValState, Var,
 };
 
 use crate::common::{matches_boolean, matches_number};
@@ -19,7 +19,11 @@ fn is_atomic(ctrl: &SExpr) -> bool {
    }
 }
 
-fn atomic_eval(SExprState { ctrl, env, .. }: &SExprState, store: &Store) -> Val {
+fn atomic_eval(
+   SExprState {
+      ctrl, env, store, ..
+   }: &SExprState,
+) -> Val {
    match ctrl {
       SExpr::List(ref list) => {
          if let Some((args, body)) = matches_lambda_expr(list) {
@@ -37,118 +41,193 @@ fn atomic_eval(SExprState { ctrl, env, .. }: &SExprState, store: &Store) -> Val 
             Val::Boolean(b)
          } else {
             store
-               .get(env.get(Var(atom.clone())).expect("Atom not in env"))
+               .get(&env.get(&Var(atom.clone())).expect("Atom not in env"))
                .expect("Atom not in store")
          }
       }
    }
 }
 
-fn handle_prim_expr(prim: Prim, mut args: Vec<SExpr>, st: &SExprState, store: &mut Store) -> State {
-   let SExprState { env, kont_addr, .. } = st.clone();
+fn handle_prim_expr(prim: Prim, mut args: Vec<SExpr>, st: &SExprState) -> State {
+   let SExprState {
+      env,
+      store,
+      kstore,
+      kaddr,
+      time,
+      ..
+   } = st.clone();
    if args.is_empty() {
       let val = apply_prim(prim, &[]);
-      State::Apply(ValState::new(val, env, kont_addr, st.tick(1)))
+      State::Apply(ValState::new(val, store, kstore, kaddr, time))
    } else {
       let arg0 = args.remove(0);
-      let new_kont = Kont::Prim(
+      let next_kaddr = st.alloc(0);
+      let next_time = st.tick(1);
+      let next_k = Kont::Prim(
          prim,
          Vec::with_capacity(args.len()),
          args,
          env.clone(),
-         kont_addr,
+         kaddr,
       );
-      let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-      State::Eval(SExprState::new(arg0, env, next_kaddr, st.tick(1)))
+      let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+      State::Eval(SExprState::new(
+         arg0,
+         env,
+         store,
+         next_kstore,
+         next_kaddr,
+         next_time,
+      ))
    }
 }
 
-fn handle_let_expr(
-   vars: Vec<Var>,
-   mut exprs: Vec<SExpr>,
-   eb: SExpr,
-   st: &SExprState,
-   store: &mut Store,
-) -> State {
-   let SExprState { env, kont_addr, .. } = st.clone();
+fn handle_let_expr(vars: Vec<Var>, mut exprs: Vec<SExpr>, eb: SExpr, st: &SExprState) -> State {
+   let SExprState {
+      env,
+      store,
+      kstore,
+      kaddr,
+      ..
+   } = st.clone();
    let len = vars.len();
    if len == 0 {
       // why would you write (let () eb) you heathen
       // because of you I have to cover this case
-      State::Eval(SExprState::new(eb, env, kont_addr, st.tick(1)))
+      State::Eval(SExprState::new(eb, env, store, kstore, kaddr, st.tick(1)))
    } else {
       let e0 = exprs.remove(0);
       let rest = exprs;
-      let new_kont = Kont::Let(
-         vars,
-         Vec::with_capacity(len),
-         rest,
-         eb,
-         env.clone(),
-         kont_addr,
-      );
-      let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-      State::Eval(SExprState::new(e0, env, next_kaddr, st.tick(1)))
+      let next_kaddr = st.alloc(0);
+      let next_time = st.tick(1);
+      let next_k = Kont::Let(vars, Vec::with_capacity(len), rest, eb, env.clone(), kaddr);
+      let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+      State::Eval(SExprState::new(
+         e0,
+         env,
+         store,
+         next_kstore,
+         next_kaddr,
+         next_time,
+      ))
    }
 }
 
-fn handle_function_application_expr(list: &[SExpr], st: &SExprState, store: &mut Store) -> State {
-   let SExprState { env, kont_addr, .. } = st.clone();
-   // application case
-   let (func, args) = list.split_first().expect("Given Empty List");
-   let new_kont = Kont::App(
-      Vec::with_capacity(list.len()),
-      args.to_vec(),
-      env.clone(),
-      kont_addr,
-   );
-   let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-   State::Eval(SExprState::new(func.clone(), env, next_kaddr, st.tick(1)))
+fn handle_function_application_expr(list: &[SExpr], st: &SExprState) -> State {
+   let SExprState {
+      env,
+      store,
+      kstore,
+      kaddr,
+      ..
+   } = st.clone();
+   let mut args = list.to_vec();
+   let func = args.remove(0);
+
+   let next_kaddr = st.alloc(0);
+   let next_time = st.tick(1);
+   let next_k = Kont::App(Vec::with_capacity(list.len()), args, env.clone(), kaddr);
+   let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+   State::Eval(SExprState::new(
+      func,
+      env,
+      store,
+      next_kstore,
+      next_kaddr,
+      next_time,
+   ))
 }
 
-pub fn eval_step(st: &SExprState, store: &mut Store) -> State {
+pub fn eval_step(st: &SExprState) -> State {
    let SExprState {
       ctrl,
+      store,
+      kstore,
       env,
-      kont_addr,
+      kaddr,
       ..
    } = st.clone();
    if is_atomic(&ctrl) {
-      let val = atomic_eval(st, store);
-      let val_state = ValState::new(val, env, kont_addr, st.tick(1));
-      State::Apply(val_state)
+      let val = atomic_eval(st);
+      State::Apply(ValState::new(val, store, kstore, kaddr, st.tick(1)))
    } else {
       match ctrl {
          SExpr::List(ref list) => {
             if let Some((ec, et, ef)) = matches_if_expr(list) {
-               let new_kont = Kont::If(et, ef, env.clone(), kont_addr);
-               let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-               State::Eval(SExprState::new(ec, env, next_kaddr, st.tick(1)))
+               let next_kaddr = st.alloc(0);
+               let next_time = st.tick(1);
+               let next_k = Kont::If(et, ef, env.clone(), kaddr);
+               let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+               State::Eval(SExprState::new(
+                  ec,
+                  env,
+                  store,
+                  next_kstore,
+                  next_kaddr,
+                  next_time,
+               ))
             } else if let Some((vars, exprs, eb)) = matches_let_expr(list) {
-               handle_let_expr(vars, exprs, eb, st, store)
-            } else if let Some((func, arglist)) = matches_apply_expr(list) {
-               let new_kont = Kont::ApplyList(None, arglist, env.clone(), kont_addr);
-               let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-               State::Eval(SExprState::new(func, env, next_kaddr, st.tick(1)))
+               handle_let_expr(vars, exprs, eb, st)
+            } else if let Some((ef, ex)) = matches_apply_expr(list) {
+               let next_kaddr = st.alloc(0);
+               let next_time = st.tick(1);
+               let next_k = Kont::ApplyList(None, ex, env.clone(), kaddr);
+               let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+               State::Eval(SExprState::new(
+                  ef,
+                  env,
+                  store,
+                  next_kstore,
+                  next_kaddr,
+                  next_time,
+               ))
             } else if let Some((prim, args)) = matches_prim_expr(list) {
-               handle_prim_expr(prim, args, st, store)
+               handle_prim_expr(prim, args, st)
             } else if let Some((prim, listexpr)) = matches_apply_prim_expr(list) {
-               let new_kont = Kont::ApplyPrim(prim, env.clone(), kont_addr);
-               let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-               State::Eval(SExprState::new(listexpr, env, next_kaddr, st.tick(1)))
+               let next_kaddr = st.alloc(0);
+               let next_time = st.tick(1);
+               let next_k = Kont::ApplyPrim(prim, env.clone(), kaddr);
+               let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+               State::Eval(SExprState::new(
+                  listexpr,
+                  env,
+                  store,
+                  next_kstore,
+                  next_kaddr,
+                  next_time,
+               ))
             } else if let Some(e) = matches_callcc_expr(list) {
-               let new_kont = Kont::Callcc(env.clone(), kont_addr);
-               let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-               State::Eval(SExprState::new(e, env, next_kaddr, st.tick(1)))
+               let next_kaddr = st.alloc(0);
+               let next_time = st.tick(1);
+               let next_k = Kont::Callcc(kaddr);
+               let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+               State::Eval(SExprState::new(
+                  e,
+                  env,
+                  store,
+                  next_kstore,
+                  next_kaddr,
+                  next_time,
+               ))
             } else if let Some((var, e)) = matches_setbang_expr(list) {
-               let new_kont = Kont::Set(var, env.clone(), kont_addr);
-               let next_kaddr = store.add_to_store(Val::Kont(new_kont), st);
-               State::Eval(SExprState::new(e, env, next_kaddr, st.tick(1)))
+               let next_kaddr = st.alloc(0);
+               let next_time = st.tick(1);
+               let next_k = Kont::Set(var, env.clone(), kaddr);
+               let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
+               State::Eval(SExprState::new(
+                  e,
+                  env,
+                  store,
+                  next_kstore,
+                  next_kaddr,
+                  next_time,
+               ))
             } else {
-               handle_function_application_expr(list, st, store)
+               handle_function_application_expr(list, st)
             }
          }
-         SExpr::Atom(ref _atom) => {
+         SExpr::Atom(_) => {
             panic!("Was not handled by atomic case??");
          }
       }
