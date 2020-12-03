@@ -66,6 +66,25 @@ instead of figuring out the address later. Thats what AAM does... And AAM == rig
 * Right now, continuations dont take value stores. Is there some weird behavior that can come about if a value is mutated with `set!` and then when its time to read the continuation, a wrong value is propogated?
 * In rust code, use a `KAddr` type for the KStore? Better typesafety.
 
+## Bibliography ##
+
+- Abstracting Abstract Machines (AAM)
+- - Paper that introduces the idea of making an Abstract Interpreter out of a direct-style abstract machine. Has a good intro section describing how to go from CEK to an abstract time-stamped CESK*.
+- - D. V. Horn and M. Might, “Abstracting Abstract Machines”.
+- - Available online [here](http://matt.might.net/papers/vanhorn2010abstract.pdf)
+- Pushdown Control-Flow Analysis for Free (P4F)
+- - Continues on AAM to describe a good analysis that you can do for cheap. The background section was _very helpful_ in understanding how to better abstract an AM. Would recommend just the background section if you are still confused after AAM.
+- - T. Gilray, S. Lyde, M. D. Adams, M. Might, and D. Van Horn, “Pushdown Control-Flow Analysis for Free,” Proceedings of the 43rd Annual ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages - POPL 2016, pp. 691–704, 2016, doi: 10.1145/2837614.2837631.
+- - Available online [here](https://gilray.org/pdf/pushdown-for-free.pdf)
+- Abstract Interpretation by Cousot & Cousot
+- - The original paper on Abstract Interpretation. Pretty tough read, but helpful after a bunch of thorough readings!
+- - P. Cousot and R. Cousot, “Abstract Interpretation: A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation Of Fixpoints".
+- - Available online [here](https://dl.acm.org/doi/10.1145/512950.512973) (search around for a PDF)
+- Matt Might's Dissertation
+- - This paper doesnt do AAMs but talks about Abstract Interpretation, CFA, and a few other topics. Also a helpful paper!
+- - M. Might, “Environment analysis of higher-order languages” 2007.
+- - Available online [here](http://matt.might.net/papers/might2007diss.pdf)
+
 ## License ##
 
 MIT license! Enjoy!
