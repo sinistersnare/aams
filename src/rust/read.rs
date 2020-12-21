@@ -1,5 +1,5 @@
 //! A Parser of Scheme types.
-//! `SExpr` is the AST type here that will be executed.
+//! `Expr` is the AST type here that will be executed.
 
 use combine::error::ParseError;
 use combine::parser::char::{char, space};
@@ -8,9 +8,9 @@ use combine::{
    between, choice, many1, parser, satisfy, sep_by, skip_many, skip_many1, token, Parser,
 };
 
-use crate::common::SExpr;
+use crate::common::Expr;
 
-fn expr_<Input>() -> impl Parser<Input, Output = SExpr>
+fn expr_<Input>() -> impl Parser<Input, Output = Expr>
 where
    Input: Stream<Token = char>,
    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
@@ -44,21 +44,21 @@ where
    let list = between(lex_char('('), lex_char(')'), space_separated_exprs());
    let sqlist = between(lex_char('['), lex_char(']'), space_separated_exprs());
    choice((
-      atom.map(SExpr::Atom),
-      list.map(SExpr::List),
-      sqlist.map(SExpr::List),
+      atom.map(Expr::Atom),
+      list.map(Expr::List),
+      sqlist.map(Expr::List),
    ))
    .skip(whitespace())
 }
 
 parser! {
-   fn expr[Input]()(Input) -> SExpr
+   fn expr[Input]()(Input) -> Expr
    where [Input: Stream<Token = char>]
    {
       expr_()
    }
 }
 
-pub fn parse_expr(input: &str) -> Result<(SExpr, &str), combine::error::StringStreamError> {
+pub fn parse_expr(input: &str) -> Result<(Expr, &str), combine::error::StringStreamError> {
    expr().parse(input)
 }

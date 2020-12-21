@@ -2,13 +2,13 @@ use std::fmt;
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum State {
-   Eval(SExprState),
-   Apply(ValState),
+   Eval(EvalState),
+   Apply(ApplyState),
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct SExprState {
-   pub ctrl: SExpr,
+pub struct EvalState {
+   pub ctrl: Expr,
    pub env: Env,
    pub store: Store,
    pub kstore: KStore,
@@ -17,7 +17,7 @@ pub struct SExprState {
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct ValState {
+pub struct ApplyState {
    pub ctrl: Val,
    pub store: Store,
    pub kstore: KStore,
@@ -26,8 +26,8 @@ pub struct ValState {
 }
 
 #[derive(Hash, Clone, PartialEq, Eq)]
-pub enum SExpr {
-   List(Vec<SExpr>),
+pub enum Expr {
+   List(Vec<Expr>),
    Atom(String),
 }
 
@@ -42,18 +42,30 @@ pub struct KStore(pub im::HashMap<Addr, Kont>);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum Val {
-   Null, // mostly used as end-of-list sentinel value.
-   Void, // returned by things like `(set! x e)`, (prim println), etc.
+   /// Also can be used as end-of-list sentinel value.
+   Null,
+   /// returned by things like `(set! x e)`, (prim println), etc.
+   Void,
+   /// A closure is a syntactic lambda (a function) with an environment
+   /// so that free variables inside of it are bound.
    Closure(Closure),
+   /// A number... do you need docs?
+   /// TODO: make f64.
    Number(i64),
+   /// A reified continuation, which can be called with 1 argument
+   /// to continue processing with the continuation.
    Kont(Kont),
+   /// a boolean value, can be true or false.
    Boolean(bool),
-   Quote(SExpr),
+   /// A quoted S-Expression, which does not evaluate it.
+   Quote(Expr),
+   /// a compound object formed from 2 other values
+   /// can be used to implement lists.
    Cons(Box<Val>, Box<Val>),
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Closure(pub CloType, pub SExpr, pub Env);
+pub struct Closure(pub CloType, pub Expr, pub Env);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum CloType {
@@ -63,15 +75,19 @@ pub enum CloType {
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum Kont {
+   /// The empty continuation, meaning there is nothing else to do.
    Empty,
-   If(SExpr, SExpr, Env, Addr),
-   Let(Vec<Var>, Vec<Val>, Vec<SExpr>, SExpr, Env, Addr),
+   /// a conditional
+   If(Expr, Expr, Env, Addr),
+   /// A let binding continuation
+   /// After each Expr in
+   Let(Vec<Var>, Vec<Val>, Vec<Expr>, Expr, Env, Addr),
    Callcc(Addr),
    Set(Addr, Addr),
-   Prim(Prim, Vec<Val>, Vec<SExpr>, Env, Addr),
+   Prim(Prim, Vec<Val>, Vec<Expr>, Env, Addr),
    ApplyPrim(Prim, Addr),
-   ApplyList(Option<Box<Val>>, SExpr, Env, Addr),
-   App(Vec<Val>, Vec<SExpr>, Env, Addr),
+   ApplyList(Option<Box<Val>>, Expr, Env, Addr),
+   App(Vec<Val>, Vec<Expr>, Env, Addr),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -98,16 +114,16 @@ pub trait Alloc {
    fn tick(&self, amt: u64) -> Time;
 }
 
-impl SExprState {
+impl EvalState {
    pub fn new(
-      ctrl: SExpr,
+      ctrl: Expr,
       env: Env,
       store: Store,
       kstore: KStore,
       kaddr: Addr,
       time: Time,
-   ) -> SExprState {
-      SExprState {
+   ) -> EvalState {
+      EvalState {
          ctrl,
          env,
          store,
@@ -118,21 +134,21 @@ impl SExprState {
    }
 }
 
-impl Alloc for SExprState {
+impl Alloc for EvalState {
    fn alloc(&self, offset: u64) -> Addr {
-      let SExprState { time: Time(t), .. } = self;
+      let EvalState { time: Time(t), .. } = self;
       Addr(*t + offset)
    }
 
    fn tick(&self, amt: u64) -> Time {
-      let SExprState { time: Time(t), .. } = self;
+      let EvalState { time: Time(t), .. } = self;
       Time(t + amt)
    }
 }
 
-impl ValState {
-   pub fn new(ctrl: Val, store: Store, kstore: KStore, kaddr: Addr, time: Time) -> ValState {
-      ValState {
+impl ApplyState {
+   pub fn new(ctrl: Val, store: Store, kstore: KStore, kaddr: Addr, time: Time) -> ApplyState {
+      ApplyState {
          ctrl,
          store,
          kstore,
@@ -142,14 +158,14 @@ impl ValState {
    }
 }
 
-impl Alloc for ValState {
+impl Alloc for ApplyState {
    fn alloc(&self, offset: u64) -> Addr {
-      let ValState { time: Time(t), .. } = self;
+      let ApplyState { time: Time(t), .. } = self;
       Addr(*t + offset)
    }
 
    fn tick(&self, amt: u64) -> Time {
-      let ValState { time: Time(t), .. } = self;
+      let ApplyState { time: Time(t), .. } = self;
       Time(t + amt)
    }
 }
@@ -157,15 +173,15 @@ impl Alloc for ValState {
 impl Alloc for State {
    fn alloc(&self, offset: u64) -> Addr {
       match self {
-         State::Eval(s) => s.alloc(offset),
-         State::Apply(v) => v.alloc(offset),
+         State::Eval(e) => e.alloc(offset),
+         State::Apply(a) => a.alloc(offset),
       }
    }
 
    fn tick(&self, amt: u64) -> Time {
       match self {
-         State::Eval(s) => s.tick(amt),
-         State::Apply(v) => v.tick(amt),
+         State::Eval(e) => e.tick(amt),
+         State::Apply(a) => a.tick(amt),
       }
    }
 }
@@ -206,10 +222,10 @@ impl KStore {
    }
 }
 
-impl fmt::Debug for SExpr {
+impl fmt::Debug for Expr {
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
       match self {
-         SExpr::List(ref list) => {
+         Expr::List(ref list) => {
             write!(f, "(")?;
             for (i, e) in list.iter().enumerate() {
                write!(f, "{:?}", e)?;
@@ -219,7 +235,7 @@ impl fmt::Debug for SExpr {
             }
             write!(f, ")")
          }
-         SExpr::Atom(ref atom) => write!(f, "{}", atom),
+         Expr::Atom(ref atom) => write!(f, "{}", atom),
       }
    }
 }

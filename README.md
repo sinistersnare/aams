@@ -1,11 +1,11 @@
 # Abstract Machines ... Abstracted! #
 
 I wrote about what abstraction machines are
-[on my blog here](https://drs.is/post/abstract-machines/).
-This repo implements an abstract machine: a `time-stamped CESK*` Machine.
+[on my blog here](https://drs.is/tags/abstract-machines/).
+This repo implements an abstract machine (think `CESK` machine).
 I then use concepts from the
 ['Abstracting Abstract Machines' paper](http://matt.might.net/papers/vanhorn2010abstract.pdf)
-To create a static-analysis of it.
+To create a static-analysis of it. See the bibliography below for more info.
 
 * `latex/`: Formalizations of these machines in LaTeX computer-sciencese.
 * `src/`: Implementation of the formalizations in both `Racket` and `Rust`.
@@ -23,8 +23,8 @@ In the `examples/` directory are some basic scheme programs accepted by these ma
 To run the Rust code
 
 ```bash
-cargo run -- examples/basic.scm # to run a scheme file
-cargo run # to start a REPL
+$ cargo run -- examples/basic.scm # to run a scheme file
+$ cargo run # to start a REPL
 ```
 
 For Racket, load the machine up in your Racket environment of choice,
@@ -34,13 +34,16 @@ and use the `evaluate` function to run a program.
 > (evaluate '(prim + 3 4 (let ([x 6] [y 10]) (prim + x y))))
 ```
 
-## Abstrat Interpretation ##
+I haphazardly implemented primitives, the racket version has more than the Rust.
+
+## Abstract Interpretation ##
 
 Abstract Interpretation is a style of static-analysis that attempts
-to run the program in a decidably computable, sound way
+to run the program in a decidably computable and sound way
 (No we did not have to solve the halting problem).
-By computing using abstract values insted of concrete values,
-we can over-approximate program behavior.
+By turning the infinite-state-machine of the interpreter
+into a finite-state-machine (by over-approximating values)
+we can safely analyze programs.
 
 'Abstracting Abstract Machines' shows how we can use Abstract Machines
 to more easily create abstract interpreters. Thats what we are doing here,
@@ -49,14 +52,14 @@ to create an analysis.
 
 ## Future Work / TODO ##
 
-I also plan on implementing Delimited Continuations instead of one-shot
-continuations. DCs are much more efficient and powerful.
+I also plan on implementing Delimited Continuations instead of full-shot, undelimited, escaping
+continuations. DCs are much more efficient and usable.
 Hopefully after I get the analysis finished, I can start on this!
 
-I want to extend the machines semantics to cover most of
+I want to extend the machines semantics to cover an early pass of
 [SinScheme](https://github.com/sinistersnare/SinScheme).
 That way, I can do a static analysis of it, and perform real optimizations
-on it. This is a a stretch goal, but I think its doable!
+on it. This is a a stretch goal, but I think it's doable!
 
 * Right now, continuations dont take value stores. Is there some weird behavior that can come about if a value is mutated with `set!` and then when its time to read the continuation, a wrong value is propogated?
 * In rust code, use a `KAddr` type for the KStore? Better typesafety.
