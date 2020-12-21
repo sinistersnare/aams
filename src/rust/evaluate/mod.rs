@@ -5,21 +5,17 @@ mod apply;
 mod eval;
 pub mod matching;
 
-use crate::common::{Address, Env, EvalState, Expr, KStore, Kont, State, Store};
+use crate::common::{eval_state, Address, Env, Expr, Kont, State, Store};
 use apply::apply_step;
 use eval::eval_step;
 
 fn inject(ctrl: Expr) -> State {
-   State::Eval(EvalState::new(
+   eval_state(
       ctrl,
       Env(im::HashMap::new()),
-      Store(im::HashMap::new()),
-      KStore(im::HashMap::unit(
-         Address::KAddr(Expr::Atom("".to_string()), 0),
-         Kont::Empty,
-      )),
+      Store::new().insertk(Address::KAddr(Expr::Atom("".to_string()), 0), Kont::Empty),
       Address::KAddr(Expr::Atom("".to_string()), 0),
-   ))
+   )
 }
 
 pub fn step(st: &State) -> State {

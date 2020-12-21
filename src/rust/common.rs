@@ -1,16 +1,5 @@
 use std::fmt;
 
-/// Allocates an address for a binding
-/// TODO: actually write these...
-pub fn apply_alloc(_st: &ApplyState, _offset: usize) -> Address {
-   Address::BAddr(Var("WRONG".to_string()), 0)
-}
-
-/// Allocates an address for a continuation
-pub fn eval_alloc(_st: &EvalState, _offset: usize) -> Address {
-   Address::BAddr(Var("WRONG".to_string()), 0)
-}
-
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum State {
    Eval(EvalState),
@@ -22,15 +11,13 @@ pub struct EvalState {
    pub ctrl: Expr,
    pub env: Env,
    pub store: Store,
-   pub kstore: KStore,
    pub kaddr: Address,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct ApplyState {
-   pub ctrl: Val,
+   pub val: Val,
    pub store: Store,
-   pub kstore: KStore,
    pub kaddr: Address,
 }
 
@@ -44,10 +31,10 @@ pub enum Expr {
 pub struct Env(pub im::HashMap<Var, Address>);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Store(pub im::HashMap<Address, Val>);
-
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct KStore(pub im::HashMap<Address, Kont>);
+pub struct Store {
+   binds: im::HashMap<Address, Val>,
+   konts: im::HashMap<Address, Kont>,
+}
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum Val {
@@ -113,25 +100,19 @@ pub enum Address {
 pub struct Prim(pub String);
 
 impl EvalState {
-   pub fn new(ctrl: Expr, env: Env, store: Store, kstore: KStore, kaddr: Address) -> EvalState {
+   pub fn new(ctrl: Expr, env: Env, store: Store, kaddr: Address) -> EvalState {
       EvalState {
          ctrl,
          env,
          store,
-         kstore,
          kaddr,
       }
    }
 }
 
 impl ApplyState {
-   pub fn new(ctrl: Val, store: Store, kstore: KStore, kaddr: Address) -> ApplyState {
-      ApplyState {
-         ctrl,
-         store,
-         kstore,
-         kaddr,
-      }
+   pub fn new(val: Val, store: Store, kaddr: Address) -> ApplyState {
+      ApplyState { val, store, kaddr }
    }
 }
 
@@ -148,26 +129,40 @@ impl Env {
 }
 
 impl Store {
+   pub fn new() -> Store {
+      Store {
+         binds: im::HashMap::new(),
+         konts: im::HashMap::new(),
+      }
+   }
+
    pub fn insert(&self, k: Address, v: Val) -> Store {
-      let mut newenv = self.0.clone();
-      newenv.insert(k, v);
-      Store(newenv)
+      if let Address::BAddr(..) = k {
+         Store {
+            binds: self.binds.update(k, v),
+            konts: self.konts.clone(),
+         }
+      } else {
+         panic!("Not given a binding-addr with the value. {:?}", k);
+      }
+   }
+
+   pub fn insertk(&self, a: Address, k: Kont) -> Store {
+      if let Address::KAddr(..) = a {
+         Store {
+            binds: self.binds.clone(),
+            konts: self.konts.update(a, k),
+         }
+      } else {
+         panic!("Not given a kont-addr with the kont. {:?}", k);
+      }
    }
 
    pub fn get(&self, k: &Address) -> Option<Val> {
-      self.0.get(k).cloned()
-   }
-}
-
-impl KStore {
-   pub fn insert(&self, k: Address, v: Kont) -> KStore {
-      let mut newenv = self.0.clone();
-      newenv.insert(k, v);
-      KStore(newenv)
-   }
-
-   pub fn get(&self, k: &Address) -> Option<Kont> {
-      self.0.get(k).cloned()
+      match k {
+         Address::BAddr(..) => self.binds.get(k).cloned(),
+         Address::KAddr(..) => self.konts.get(k).cloned().map(|k| Val::Kont(k)),
+      }
    }
 }
 
@@ -231,4 +226,23 @@ pub fn matches_boolean(str: &str) -> Option<bool> {
    } else {
       None
    }
+}
+
+/// Allocates an address for a binding
+/// TODO: actually write these...
+pub fn apply_alloc(_st: &ApplyState, _offset: usize) -> Address {
+   Address::BAddr(Var("WRONG".to_string()), 0)
+}
+
+/// Allocates an address for a continuation
+pub fn eval_alloc(_st: &EvalState, _offset: usize) -> Address {
+   Address::BAddr(Var("WRONG".to_string()), 0)
+}
+
+pub fn apply_state(val: Val, store: Store, kaddr: Address) -> State {
+   State::Apply(ApplyState::new(val, store, kaddr))
+}
+
+pub fn eval_state(ctrl: Expr, env: Env, store: Store, kaddr: Address) -> State {
+   State::Eval(EvalState::new(ctrl, env, store, kaddr))
 }

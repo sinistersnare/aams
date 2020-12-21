@@ -4,33 +4,23 @@
 //! because the control is a value.
 
 use crate::common::{
-   apply_alloc, make_scm_list, scm_list_to_vals, val_is_list, ApplyState, CloType, Closure,
-   EvalState, Expr, Kont, State, Val,
+   apply_alloc, apply_state, eval_state, make_scm_list, scm_list_to_vals, val_is_list, ApplyState,
+   CloType, Closure, Expr, Kont, State, Val,
 };
 use crate::prims::apply_prim;
 
 fn handle_if_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::If(et, ef, ifenv, next_kaddr) = k {
       let next_e = if val == Val::Boolean(false) { ef } else { et };
-      State::Eval(EvalState::new(next_e, ifenv, store, kstore, next_kaddr))
+      eval_state(next_e, ifenv, store, next_kaddr)
    } else {
       panic!("Given Wrong Kontinuation");
    }
 }
 
 fn handle_let_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::Let(vars, mut done, mut todo, eb, letenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
@@ -41,19 +31,13 @@ fn handle_let_kont(k: Kont, st: &ApplyState) -> State {
             next_env = next_env.insert(bndvar.clone(), addr.clone());
             next_store = next_store.insert(addr, val.clone());
          }
-         State::Eval(EvalState::new(eb, next_env, next_store, kstore, next_kaddr))
+         eval_state(eb, next_env, next_store, next_kaddr)
       } else {
          let head = todo.remove(0);
          let next_next_kaddr = apply_alloc(st, 0);
          let next_k = Kont::Let(vars, done, todo, eb, letenv.clone(), next_kaddr);
-         let next_kstore = kstore.insert(next_next_kaddr.clone(), next_k);
-         State::Eval(EvalState::new(
-            head,
-            letenv,
-            store,
-            next_kstore,
-            next_next_kaddr,
-         ))
+         let next_store = store.insertk(next_next_kaddr.clone(), next_k);
+         eval_state(head, letenv, next_store, next_next_kaddr)
       }
    } else {
       panic!("Given Wrong Kontinuation");
@@ -61,29 +45,18 @@ fn handle_let_kont(k: Kont, st: &ApplyState) -> State {
 }
 
 fn handle_prim_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::Prim(op, mut done, mut todo, primenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
          let val = apply_prim(op, &done);
-         State::Apply(ApplyState::new(val, store, kstore, next_kaddr))
+         apply_state(val, store, next_kaddr)
       } else {
          let head = todo.remove(0);
          let next_next_kaddr = apply_alloc(st, 0);
          let next_k = Kont::Prim(op, done, todo, primenv.clone(), next_kaddr);
-         let next_kstore = kstore.insert(next_next_kaddr.clone(), next_k);
-         State::Eval(EvalState::new(
-            head,
-            primenv,
-            store,
-            next_kstore,
-            next_next_kaddr,
-         ))
+         let next_store = store.insertk(next_next_kaddr.clone(), next_k);
+         eval_state(head, primenv, next_store, next_next_kaddr)
       }
    } else {
       panic!("Given Wrong Kontinuation");
@@ -91,30 +64,20 @@ fn handle_prim_kont(k: Kont, st: &ApplyState) -> State {
 }
 
 fn handle_apply_prim_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::ApplyPrim(op, next_kaddr) = k {
       if !val_is_list(&val) {
          panic!("Apply not given a list.");
       }
       let val = apply_prim(op, &scm_list_to_vals(val));
-      State::Apply(ApplyState::new(val, store, kstore, next_kaddr))
+      apply_state(val, store, next_kaddr)
    } else {
       panic!("Given Wrong Kontinuation");
    }
 }
 
 fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::Callcc(ref next_kaddr) = k {
       if let Val::Closure(Closure(clotype, body, cloenv)) = val {
          match clotype {
@@ -123,16 +86,14 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
                   panic!("call/cc lambda only takes 1 argument!");
                }
                let addr = apply_alloc(st, 0);
-               let next_k = kstore.get(next_kaddr).expect("K doesnt exist...?");
+               let next_k = match store.get(next_kaddr) {
+                  Some(Val::Kont(k)) => k,
+                  Some(other) => panic!("Not given a K: {:?}", other),
+                  None => panic!("K not found with addr: {:?}", next_kaddr),
+               };
                let next_env = cloenv.insert(params.remove(0), addr.clone());
                let next_store = store.insert(addr, Val::Kont(next_k));
-               State::Eval(EvalState::new(
-                  body,
-                  next_env,
-                  next_store,
-                  kstore,
-                  next_kaddr.clone(),
-               ))
+               eval_state(body, next_env, next_store, next_kaddr.clone())
             }
             CloType::VarArg(_) => {
                panic!("call/cc takes a multi-arg lambda, not vararg");
@@ -140,13 +101,8 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
          }
       } else if let Val::Kont(kv) = val {
          let next_kaddr = apply_alloc(st, 0);
-         let next_kstore = kstore.insert(next_kaddr.clone(), kv);
-         State::Apply(ApplyState::new(
-            Val::Kont(k.clone()),
-            store,
-            next_kstore,
-            next_kaddr,
-         ))
+         let next_store = store.insertk(next_kaddr.clone(), kv);
+         apply_state(Val::Kont(k.clone()), next_store, next_kaddr)
       } else {
          panic!("Call/cc given wrong type of argument.");
       }
@@ -156,27 +112,17 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
 }
 
 fn handle_set_bang_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::Set(addr, next_kaddr) = k {
       let next_store = store.insert(addr, val);
-      State::Apply(ApplyState::new(Val::Void, next_store, kstore, next_kaddr))
+      apply_state(Val::Void, next_store, next_kaddr)
    } else {
       panic!("Given Wrong Kontinuation");
    }
 }
 
 fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::ApplyList(maybe_func, arglist, applyenv, next_kaddr) = k {
       match maybe_func {
          Some(func) => {
@@ -208,16 +154,12 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> State {
                   next_env = next_env.insert(arg.clone(), addr.clone());
                   next_store = next_store.insert(addr, argval.clone());
                }
-               State::Eval(EvalState::new(
-                  body, next_env, next_store, kstore, next_kaddr,
-               ))
+               eval_state(body, next_env, next_store, next_kaddr)
             } else if let Val::Closure(Closure(CloType::VarArg(arg), body, cloenv)) = *func {
                let addr = apply_alloc(st, 0);
                let next_env = cloenv.insert(arg, addr.clone());
                let next_store = store.insert(addr, val);
-               State::Eval(EvalState::new(
-                  body, next_env, next_store, kstore, next_kaddr,
-               ))
+               eval_state(body, next_env, next_store, next_kaddr)
             } else {
                panic!("Not given a function in `(apply func arglist)`");
             }
@@ -230,14 +172,8 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> State {
                applyenv.clone(),
                next_kaddr,
             );
-            let next_kstore = kstore.insert(next_next_kaddr.clone(), next_k);
-            State::Eval(EvalState::new(
-               arglist,
-               applyenv,
-               store,
-               next_kstore,
-               next_next_kaddr,
-            ))
+            let next_store = store.insertk(next_next_kaddr.clone(), next_k);
+            eval_state(arglist, applyenv, next_store, next_next_kaddr)
          }
       }
    } else {
@@ -246,12 +182,7 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> State {
 }
 
 fn handle_app(k: Kont, st: &ApplyState) -> State {
-   let ApplyState {
-      ctrl: val,
-      store,
-      kstore,
-      ..
-   } = st.clone();
+   let ApplyState { val, store, .. } = st.clone();
    if let Kont::App(mut done, mut todo, appenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
@@ -270,18 +201,14 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
                      next_env = next_env.insert(param.clone(), addr.clone());
                      next_store = next_store.insert(addr, arg.clone());
                   }
-                  State::Eval(EvalState::new(
-                     body, next_env, next_store, kstore, next_kaddr,
-                  ))
+                  eval_state(body, next_env, next_store, next_kaddr)
                }
                CloType::VarArg(vararg) => {
                   let scm_list = make_scm_list(args);
                   let addr = apply_alloc(st, 0);
                   let next_env = cloenv.insert(vararg, addr.clone());
                   let next_store = store.insert(addr, scm_list);
-                  State::Eval(EvalState::new(
-                     body, next_env, next_store, kstore, next_kaddr,
-                  ))
+                  eval_state(body, next_env, next_store, next_kaddr)
                }
             }
          } else if let Val::Kont(kv) = head {
@@ -290,13 +217,8 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
             }
             // replace the current continuation with the stored one.
             let next_next_kaddr = apply_alloc(st, 0);
-            let next_kstore = kstore.insert(next_next_kaddr.clone(), kv);
-            State::Apply(ApplyState::new(
-               args.remove(0),
-               store,
-               next_kstore,
-               next_next_kaddr,
-            ))
+            let next_store = store.insertk(next_next_kaddr.clone(), kv);
+            apply_state(args.remove(0), next_store, next_next_kaddr)
          } else {
             panic!("Closure wasnt head of application");
          }
@@ -304,14 +226,8 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
          let head = todo.remove(0);
          let next_next_kaddr = apply_alloc(st, 0);
          let next_kont = Kont::App(done, todo, appenv.clone(), next_kaddr);
-         let next_kstore = kstore.insert(next_next_kaddr.clone(), next_kont);
-         State::Eval(EvalState::new(
-            head,
-            appenv,
-            store,
-            next_kstore,
-            next_next_kaddr,
-         ))
+         let next_store = store.insertk(next_next_kaddr.clone(), next_kont);
+         eval_state(head, appenv, next_store, next_next_kaddr)
       }
    } else {
       panic!("Given Wrong Kontinuation");
@@ -319,8 +235,13 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
 }
 
 pub fn apply_step(st: &ApplyState) -> State {
-   let ApplyState { kaddr, kstore, .. } = st.clone();
-   let kont = kstore.get(&kaddr).expect("Dont Got Kont");
+   let ApplyState { kaddr, store, .. } = st.clone();
+   let kont_val = store.get(&kaddr).expect("Dont Got Kont");
+   let kont = if let Val::Kont(k) = kont_val {
+      k
+   } else {
+      panic!("Bad KAddr {:?}", kaddr)
+   };
    match kont {
       Kont::Empty => State::Apply(st.clone()), // fixpoint!
       k @ Kont::If(..) => handle_if_kont(k, st),

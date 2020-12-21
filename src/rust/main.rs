@@ -50,7 +50,7 @@ fn exec_string(program: &str) {
          let fin_state = states.last().unwrap();
          match fin_state {
             State::Eval(e) => panic!("Howd we end with eval? {:?}", e),
-            State::Apply(v) => println!("{:?}", v.ctrl),
+            State::Apply(v) => println!("{:?}", v.val),
          }
       }
       Err(e) => println!("Error Parsing: {:?}", e),
