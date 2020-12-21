@@ -1,8 +1,12 @@
 //!
-//! Items to do with 'apply states'
+//! Items to do with 'apply states'.
+//! Apply states are evaluating the current-continuation
+//! because the control is a value.
 
-use crate::common::{make_scm_list, scm_list_to_vals, val_is_list};
-use crate::common::{Alloc, ApplyState, CloType, Closure, EvalState, Expr, Kont, State, Val};
+use crate::common::{
+   apply_alloc, make_scm_list, scm_list_to_vals, val_is_list, ApplyState, CloType, Closure,
+   EvalState, Expr, Kont, State, Val,
+};
 use crate::prims::apply_prim;
 
 fn handle_if_kont(k: Kont, st: &ApplyState) -> State {
@@ -10,14 +14,11 @@ fn handle_if_kont(k: Kont, st: &ApplyState) -> State {
       ctrl: val,
       store,
       kstore,
-      time,
       ..
    } = st.clone();
    if let Kont::If(et, ef, ifenv, next_kaddr) = k {
       let next_e = if val == Val::Boolean(false) { ef } else { et };
-      State::Eval(EvalState::new(
-         next_e, ifenv, store, kstore, next_kaddr, time,
-      ))
+      State::Eval(EvalState::new(next_e, ifenv, store, kstore, next_kaddr))
    } else {
       panic!("Given Wrong Kontinuation");
    }
@@ -33,21 +34,17 @@ fn handle_let_kont(k: Kont, st: &ApplyState) -> State {
    if let Kont::Let(vars, mut done, mut todo, eb, letenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
-         let next_time = st.tick(vars.len() as u64);
          let mut next_env = letenv;
          let mut next_store = store;
          for (i, (bndvar, val)) in vars.iter().zip(done.iter()).enumerate() {
-            let addr = st.alloc(i as u64);
+            let addr = apply_alloc(st, i);
             next_env = next_env.insert(bndvar.clone(), addr.clone());
             next_store = next_store.insert(addr, val.clone());
          }
-         State::Eval(EvalState::new(
-            eb, next_env, next_store, kstore, next_kaddr, next_time,
-         ))
+         State::Eval(EvalState::new(eb, next_env, next_store, kstore, next_kaddr))
       } else {
          let head = todo.remove(0);
-         let next_next_kaddr = st.alloc(0);
-         let next_time = st.tick(1);
+         let next_next_kaddr = apply_alloc(st, 0);
          let next_k = Kont::Let(vars, done, todo, eb, letenv.clone(), next_kaddr);
          let next_kstore = kstore.insert(next_next_kaddr.clone(), next_k);
          State::Eval(EvalState::new(
@@ -56,7 +53,6 @@ fn handle_let_kont(k: Kont, st: &ApplyState) -> State {
             store,
             next_kstore,
             next_next_kaddr,
-            next_time,
          ))
       }
    } else {
@@ -69,18 +65,16 @@ fn handle_prim_kont(k: Kont, st: &ApplyState) -> State {
       ctrl: val,
       store,
       kstore,
-      time,
       ..
    } = st.clone();
    if let Kont::Prim(op, mut done, mut todo, primenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
          let val = apply_prim(op, &done);
-         State::Apply(ApplyState::new(val, store, kstore, next_kaddr, time))
+         State::Apply(ApplyState::new(val, store, kstore, next_kaddr))
       } else {
          let head = todo.remove(0);
-         let next_next_kaddr = st.alloc(0);
-         let next_time = st.tick(1);
+         let next_next_kaddr = apply_alloc(st, 0);
          let next_k = Kont::Prim(op, done, todo, primenv.clone(), next_kaddr);
          let next_kstore = kstore.insert(next_next_kaddr.clone(), next_k);
          State::Eval(EvalState::new(
@@ -89,7 +83,6 @@ fn handle_prim_kont(k: Kont, st: &ApplyState) -> State {
             store,
             next_kstore,
             next_next_kaddr,
-            next_time,
          ))
       }
    } else {
@@ -102,7 +95,6 @@ fn handle_apply_prim_kont(k: Kont, st: &ApplyState) -> State {
       ctrl: val,
       store,
       kstore,
-      time,
       ..
    } = st.clone();
    if let Kont::ApplyPrim(op, next_kaddr) = k {
@@ -110,7 +102,7 @@ fn handle_apply_prim_kont(k: Kont, st: &ApplyState) -> State {
          panic!("Apply not given a list.");
       }
       let val = apply_prim(op, &scm_list_to_vals(val));
-      State::Apply(ApplyState::new(val, store, kstore, next_kaddr, time))
+      State::Apply(ApplyState::new(val, store, kstore, next_kaddr))
    } else {
       panic!("Given Wrong Kontinuation");
    }
@@ -130,8 +122,7 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
                if params.len() != 1 {
                   panic!("call/cc lambda only takes 1 argument!");
                }
-               let addr = st.alloc(0);
-               let next_time = st.tick(1);
+               let addr = apply_alloc(st, 0);
                let next_k = kstore.get(next_kaddr).expect("K doesnt exist...?");
                let next_env = cloenv.insert(params.remove(0), addr.clone());
                let next_store = store.insert(addr, Val::Kont(next_k));
@@ -141,7 +132,6 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
                   next_store,
                   kstore,
                   next_kaddr.clone(),
-                  next_time,
                ))
             }
             CloType::VarArg(_) => {
@@ -149,15 +139,13 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> State {
             }
          }
       } else if let Val::Kont(kv) = val {
-         let next_kaddr = st.alloc(0);
-         let next_time = st.tick(1);
+         let next_kaddr = apply_alloc(st, 0);
          let next_kstore = kstore.insert(next_kaddr.clone(), kv);
          State::Apply(ApplyState::new(
             Val::Kont(k.clone()),
             store,
             next_kstore,
             next_kaddr,
-            next_time,
          ))
       } else {
          panic!("Call/cc given wrong type of argument.");
@@ -172,18 +160,11 @@ fn handle_set_bang_kont(k: Kont, st: &ApplyState) -> State {
       ctrl: val,
       store,
       kstore,
-      time,
       ..
    } = st.clone();
    if let Kont::Set(addr, next_kaddr) = k {
       let next_store = store.insert(addr, val);
-      State::Apply(ApplyState::new(
-         Val::Void,
-         next_store,
-         kstore,
-         next_kaddr,
-         time,
-      ))
+      State::Apply(ApplyState::new(Val::Void, next_store, kstore, next_kaddr))
    } else {
       panic!("Given Wrong Kontinuation");
    }
@@ -220,32 +201,29 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> State {
                   panic!("Mismatch arg count between func and arglist.");
                }
 
-               let next_time = st.tick(args.len() as u64);
                let mut next_env = cloenv;
                let mut next_store = store;
                for (i, (arg, argval)) in args.iter().zip(argvals.iter()).enumerate() {
-                  let addr = st.alloc(i as u64);
+                  let addr = apply_alloc(st, i);
                   next_env = next_env.insert(arg.clone(), addr.clone());
                   next_store = next_store.insert(addr, argval.clone());
                }
                State::Eval(EvalState::new(
-                  body, next_env, next_store, kstore, next_kaddr, next_time,
+                  body, next_env, next_store, kstore, next_kaddr,
                ))
             } else if let Val::Closure(Closure(CloType::VarArg(arg), body, cloenv)) = *func {
-               let next_time = st.tick(1);
-               let addr = st.alloc(0);
+               let addr = apply_alloc(st, 0);
                let next_env = cloenv.insert(arg, addr.clone());
                let next_store = store.insert(addr, val);
                State::Eval(EvalState::new(
-                  body, next_env, next_store, kstore, next_kaddr, next_time,
+                  body, next_env, next_store, kstore, next_kaddr,
                ))
             } else {
                panic!("Not given a function in `(apply func arglist)`");
             }
          }
          None => {
-            let next_next_kaddr = st.alloc(0);
-            let next_time = st.tick(1);
+            let next_next_kaddr = apply_alloc(st, 0);
             let next_k = Kont::ApplyList(
                Some(Box::new(val)),
                Expr::Atom("".into()),
@@ -259,7 +237,6 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> State {
                store,
                next_kstore,
                next_next_kaddr,
-               next_time,
             ))
          }
       }
@@ -286,26 +263,24 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
                   if params.len() != args.len() {
                      panic!("arg # mismatch.");
                   }
-                  let next_time = st.tick(params.len() as u64);
                   let mut next_env = cloenv;
                   let mut next_store = store;
                   for (i, (param, arg)) in params.iter().zip(args.iter()).enumerate() {
-                     let addr = st.alloc(i as u64);
+                     let addr = apply_alloc(st, i);
                      next_env = next_env.insert(param.clone(), addr.clone());
                      next_store = next_store.insert(addr, arg.clone());
                   }
                   State::Eval(EvalState::new(
-                     body, next_env, next_store, kstore, next_kaddr, next_time,
+                     body, next_env, next_store, kstore, next_kaddr,
                   ))
                }
                CloType::VarArg(vararg) => {
                   let scm_list = make_scm_list(args);
-                  let next_time = st.tick(1);
-                  let addr = st.alloc(0);
+                  let addr = apply_alloc(st, 0);
                   let next_env = cloenv.insert(vararg, addr.clone());
                   let next_store = store.insert(addr, scm_list);
                   State::Eval(EvalState::new(
-                     body, next_env, next_store, kstore, next_kaddr, next_time,
+                     body, next_env, next_store, kstore, next_kaddr,
                   ))
                }
             }
@@ -314,23 +289,20 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
                panic!("applying a kont only takes 1 argument.");
             }
             // replace the current continuation with the stored one.
-            let next_next_kaddr = st.alloc(0);
-            let next_time = st.tick(1);
+            let next_next_kaddr = apply_alloc(st, 0);
             let next_kstore = kstore.insert(next_next_kaddr.clone(), kv);
             State::Apply(ApplyState::new(
                args.remove(0),
                store,
                next_kstore,
                next_next_kaddr,
-               next_time,
             ))
          } else {
             panic!("Closure wasnt head of application");
          }
       } else {
          let head = todo.remove(0);
-         let next_next_kaddr = st.alloc(0);
-         let next_time = st.tick(1);
+         let next_next_kaddr = apply_alloc(st, 0);
          let next_kont = Kont::App(done, todo, appenv.clone(), next_kaddr);
          let next_kstore = kstore.insert(next_next_kaddr.clone(), next_kont);
          State::Eval(EvalState::new(
@@ -339,7 +311,6 @@ fn handle_app(k: Kont, st: &ApplyState) -> State {
             store,
             next_kstore,
             next_next_kaddr,
-            next_time,
          ))
       }
    } else {

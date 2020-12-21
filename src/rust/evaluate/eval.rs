@@ -1,9 +1,11 @@
 //!
 //! Items to do with 'eval states'
-//! Those are states that deal with applying syntax
-//! To create a new state.
+//! Those are states that deal with evaluating the control
+//! to reach a value.
 
-use crate::common::{Alloc, ApplyState, Closure, EvalState, Expr, Kont, Prim, State, Val, Var};
+use crate::common::{
+   eval_alloc, ApplyState, Closure, EvalState, Expr, Kont, Prim, State, Val, Var,
+};
 
 use crate::common::{matches_boolean, matches_number};
 use crate::evaluate::matching::*; // just simple matching functions found in matching.rs
@@ -53,16 +55,14 @@ fn handle_prim_expr(prim: Prim, mut args: Vec<Expr>, st: &EvalState) -> State {
       store,
       kstore,
       kaddr,
-      time,
       ..
    } = st.clone();
    if args.is_empty() {
       let val = apply_prim(prim, &[]);
-      State::Apply(ApplyState::new(val, store, kstore, kaddr, time))
+      State::Apply(ApplyState::new(val, store, kstore, kaddr))
    } else {
       let arg0 = args.remove(0);
-      let next_kaddr = st.alloc(0);
-      let next_time = st.tick(1);
+      let next_kaddr = eval_alloc(st, 0);
       let next_k = Kont::Prim(
          prim,
          Vec::with_capacity(args.len()),
@@ -71,14 +71,7 @@ fn handle_prim_expr(prim: Prim, mut args: Vec<Expr>, st: &EvalState) -> State {
          kaddr,
       );
       let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-      State::Eval(EvalState::new(
-         arg0,
-         env,
-         store,
-         next_kstore,
-         next_kaddr,
-         next_time,
-      ))
+      State::Eval(EvalState::new(arg0, env, store, next_kstore, next_kaddr))
    }
 }
 
@@ -94,22 +87,14 @@ fn handle_let_expr(vars: Vec<Var>, mut exprs: Vec<Expr>, eb: Expr, st: &EvalStat
    if len == 0 {
       // why would you write (let () eb) you heathen
       // because of you I have to cover this case
-      State::Eval(EvalState::new(eb, env, store, kstore, kaddr, st.tick(1)))
+      State::Eval(EvalState::new(eb, env, store, kstore, kaddr))
    } else {
       let e0 = exprs.remove(0);
       let rest = exprs;
-      let next_kaddr = st.alloc(0);
-      let next_time = st.tick(1);
+      let next_kaddr = eval_alloc(st, 0);
       let next_k = Kont::Let(vars, Vec::with_capacity(len), rest, eb, env.clone(), kaddr);
       let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-      State::Eval(EvalState::new(
-         e0,
-         env,
-         store,
-         next_kstore,
-         next_kaddr,
-         next_time,
-      ))
+      State::Eval(EvalState::new(e0, env, store, next_kstore, next_kaddr))
    }
 }
 
@@ -124,18 +109,10 @@ fn handle_function_application_expr(list: &[Expr], st: &EvalState) -> State {
    let mut args = list.to_vec();
    let func = args.remove(0);
 
-   let next_kaddr = st.alloc(0);
-   let next_time = st.tick(1);
+   let next_kaddr = eval_alloc(st, 0);
    let next_k = Kont::App(Vec::with_capacity(list.len()), args, env.clone(), kaddr);
    let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-   State::Eval(EvalState::new(
-      func,
-      env,
-      store,
-      next_kstore,
-      next_kaddr,
-      next_time,
-   ))
+   State::Eval(EvalState::new(func, env, store, next_kstore, next_kaddr))
 }
 
 pub fn eval_step(st: &EvalState) -> State {
@@ -149,43 +126,26 @@ pub fn eval_step(st: &EvalState) -> State {
    } = st.clone();
    if is_atomic(&ctrl) {
       let val = atomic_eval(st);
-      State::Apply(ApplyState::new(val, store, kstore, kaddr, st.tick(1)))
+      State::Apply(ApplyState::new(val, store, kstore, kaddr))
    } else {
       match ctrl {
          Expr::List(ref list) => {
             if let Some((ec, et, ef)) = matches_if_expr(list) {
-               let next_kaddr = st.alloc(0);
-               let next_time = st.tick(1);
+               let next_kaddr = eval_alloc(st, 0);
                let next_k = Kont::If(et, ef, env.clone(), kaddr);
                let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-               State::Eval(EvalState::new(
-                  ec,
-                  env,
-                  store,
-                  next_kstore,
-                  next_kaddr,
-                  next_time,
-               ))
+               State::Eval(EvalState::new(ec, env, store, next_kstore, next_kaddr))
             } else if let Some((vars, exprs, eb)) = matches_let_expr(list) {
                handle_let_expr(vars, exprs, eb, st)
             } else if let Some((ef, ex)) = matches_apply_expr(list) {
-               let next_kaddr = st.alloc(0);
-               let next_time = st.tick(1);
+               let next_kaddr = eval_alloc(st, 0);
                let next_k = Kont::ApplyList(None, ex, env.clone(), kaddr);
                let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-               State::Eval(EvalState::new(
-                  ef,
-                  env,
-                  store,
-                  next_kstore,
-                  next_kaddr,
-                  next_time,
-               ))
+               State::Eval(EvalState::new(ef, env, store, next_kstore, next_kaddr))
             } else if let Some((prim, args)) = matches_prim_expr(list) {
                handle_prim_expr(prim, args, st)
             } else if let Some((prim, listexpr)) = matches_apply_prim_expr(list) {
-               let next_kaddr = st.alloc(0);
-               let next_time = st.tick(1);
+               let next_kaddr = eval_alloc(st, 0);
                let next_k = Kont::ApplyPrim(prim, kaddr);
                let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
                State::Eval(EvalState::new(
@@ -194,34 +154,17 @@ pub fn eval_step(st: &EvalState) -> State {
                   store,
                   next_kstore,
                   next_kaddr,
-                  next_time,
                ))
             } else if let Some(e) = matches_callcc_expr(list) {
-               let next_kaddr = st.alloc(0);
-               let next_time = st.tick(1);
+               let next_kaddr = eval_alloc(st, 0);
                let next_k = Kont::Callcc(kaddr);
                let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-               State::Eval(EvalState::new(
-                  e,
-                  env,
-                  store,
-                  next_kstore,
-                  next_kaddr,
-                  next_time,
-               ))
+               State::Eval(EvalState::new(e, env, store, next_kstore, next_kaddr))
             } else if let Some((var, e)) = matches_setbang_expr(list) {
-               let next_kaddr = st.alloc(0);
-               let next_time = st.tick(1);
+               let next_kaddr = eval_alloc(st, 0);
                let next_k = Kont::Set(env.get(&var).expect("no var"), kaddr);
                let next_kstore = kstore.insert(next_kaddr.clone(), next_k);
-               State::Eval(EvalState::new(
-                  e,
-                  env,
-                  store,
-                  next_kstore,
-                  next_kaddr,
-                  next_time,
-               ))
+               State::Eval(EvalState::new(e, env, store, next_kstore, next_kaddr))
             } else {
                handle_function_application_expr(list, st)
             }

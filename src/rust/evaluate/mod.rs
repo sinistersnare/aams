@@ -5,20 +5,20 @@ mod apply;
 mod eval;
 pub mod matching;
 
-use crate::common::{Addr, Env, EvalState, Expr, KStore, Kont, State, Store, Time};
+use crate::common::{Address, Env, EvalState, Expr, KStore, Kont, State, Store};
 use apply::apply_step;
 use eval::eval_step;
 
 fn inject(ctrl: Expr) -> State {
-   // Time 0 was for creation of the state, we start on 1.
-   // (becuase mt is addr 0, we need to start with 1)
    State::Eval(EvalState::new(
       ctrl,
       Env(im::HashMap::new()),
       Store(im::HashMap::new()),
-      KStore(im::HashMap::unit(Addr(0), Kont::Empty)),
-      Addr(0),
-      Time(1),
+      KStore(im::HashMap::unit(
+         Address::KAddr(Expr::Atom("".to_string()), 0),
+         Kont::Empty,
+      )),
+      Address::KAddr(Expr::Atom("".to_string()), 0),
    ))
 }
 
