@@ -17,6 +17,7 @@ fn prim_add(args: &Val) -> Val {
                panic!("Not given a number to add!");
             }
          },
+         Ok(ConcreteVal::Null) => {}
          Ok(ref other) => {
             panic!("Not given list, given {:?}", other);
          }
@@ -49,6 +50,7 @@ fn prim_mult(args: &Val) -> Val {
                panic!("Not given a number to add!");
             }
          },
+         Ok(ConcreteVal::Null) => {}
          Ok(ref other) => {
             panic!("Not given list, given {:?}", other);
          }

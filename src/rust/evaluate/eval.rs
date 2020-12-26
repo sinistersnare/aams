@@ -42,7 +42,11 @@ fn atomic_eval(
          } else if let Some(b) = matches_boolean(atom) {
             Val::new(ConcreteVal::Boolean(b))
          } else {
-            store.get(&env.get(&Var(atom.clone())).expect("Atom not in env"))
+            store.get(
+               &env
+                  .get(&Var(atom.clone()))
+                  .unwrap_or_else(|| panic!("Atom not in env: {:?}", atom)),
+            )
          }
       }
    }

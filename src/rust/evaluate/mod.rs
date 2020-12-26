@@ -5,7 +5,7 @@ mod apply;
 mod eval;
 pub mod matching;
 
-use crate::common::{eval_state, Address, Env, Expr, Kont, State, Store};
+use crate::common::{eval_state, kalloc, Env, Expr, Kont, State, Store};
 use apply::apply_step;
 use eval::eval_step;
 
@@ -15,34 +15,53 @@ fn inject(ctrl: Expr) -> State {
    eval_state(
       ctrl,
       Env(im::HashMap::new()),
-      Store::new().insertk(Address::KAddr(Expr::Atom("".to_string())), Kont::Empty),
-      Address::KAddr(Expr::Atom("".to_string())),
+      Store::new().insertk(kalloc(Expr::Atom("".to_string())), Kont::Empty),
+      kalloc(Expr::Atom("".to_string())),
    )
 }
 
-pub fn step(st: &State) -> im::HashSet<State> {
+/// the transfer function
+fn step(st: &State) -> im::HashSet<State> {
    match st {
       State::Eval(eval_state) => im::HashSet::unit(eval_step(eval_state)),
       State::Apply(apply_state) => apply_step(apply_state),
    }
 }
 
-pub fn evaluate(ctrl: Expr) -> im::HashSet<State> {
-   search(im::HashSet::new(), im::Vector::unit(inject(ctrl)))
+/// takes an initial expression, and evaluates it into a set of reachable states.
+pub fn evaluate(ctrl: Expr) -> im::HashMap<State, im::HashSet<State>> {
+   let e0 = inject(ctrl);
+   let mut cfg = im::HashMap::new();
+   let mut todo = im::Vector::unit(e0);
+   while !todo.is_empty() {
+      let doing = todo.remove(0);
+      // if we have already processed this state, dont do it again.
+      if cfg.contains_key(&doing) {
+         continue;
+      }
+      let results = step(&doing);
+
+      let combined_stores = combine_stores(results);
+      // add to CFG
+      cfg = cfg.update(doing, combined_stores.clone());
+      todo = im::Vector::from_iter(combined_stores.into_iter()) + todo;
+   }
+   cfg
 }
 
-fn search(seen: im::HashSet<State>, mut todo: im::Vector<State>) -> im::HashSet<State> {
-   if todo.is_empty() {
-      seen
-   } else {
-      let head = todo.remove(0);
-      if seen.contains(&head) {
-         search(seen, todo)
-      } else {
-         search(
-            seen.update(head.clone()),
-            im::Vector::from_iter(step(&head).into_iter()) + todo,
-         )
-      }
-   }
+// joins all the stores in the given states, to globalize the store component.
+fn combine_stores(states: im::HashSet<State>) -> im::HashSet<State> {
+   // first figure out what the combined, 'global', store is
+   let global = states
+      .clone()
+      .into_iter()
+      .fold(Store::new(), |accum, st| match st {
+         State::Eval(e) => accum.join(e.store),
+         State::Apply(a) => accum.join(a.store),
+      });
+   // then change every store out with the globalized one.
+   states
+      .into_iter()
+      .map(|o| o.set_store(global.clone()))
+      .collect()
 }

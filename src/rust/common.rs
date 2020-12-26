@@ -11,14 +11,14 @@ pub struct EvalState {
    pub ctrl: Expr,
    pub env: Env,
    pub store: Store,
-   pub kaddr: Address,
+   pub kaddr: KAddr,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct ApplyState {
    pub val: Val,
    pub store: Store,
-   pub kaddr: Address,
+   pub kaddr: KAddr,
 }
 
 #[derive(Hash, Clone, PartialEq, Eq)]
@@ -28,12 +28,12 @@ pub enum Expr {
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Env(pub im::HashMap<Var, Address>);
+pub struct Env(pub im::HashMap<Var, BAddr>);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Store {
-   binds: im::HashMap<Address, Val>,
-   konts: im::HashMap<Address, im::HashSet<Kont>>,
+   binds: im::HashMap<BAddr, Val>,
+   konts: im::HashMap<KAddr, im::HashSet<Kont>>,
 }
 
 // The way we are doing abstraction of the store is as so
@@ -93,35 +93,52 @@ pub enum Kont {
    /// The empty continuation, meaning there is nothing else to do.
    Empty,
    /// a conditional
-   If(Expr, Expr, Env, Address),
+   If(Expr, Expr, Env, KAddr),
    /// A let binding continuation
    /// After each Expr in
-   Let(Vec<Var>, Vec<Val>, Vec<Expr>, Expr, Env, Address),
-   Callcc(Address),
-   Set(Address, Address),
-   Prim(Prim, Vec<Val>, Vec<Expr>, Env, Address),
-   ApplyPrim(Prim, Address),
-   ApplyList(Option<Box<Val>>, Expr, Env, Address),
-   App(Vec<Val>, Vec<Expr>, Env, Address),
+   Let(Vec<Var>, Vec<Val>, Vec<Expr>, Expr, Env, KAddr),
+   Callcc(KAddr),
+   Set(BAddr, KAddr),
+   Prim(Prim, Vec<Val>, Vec<Expr>, Env, KAddr),
+   ApplyPrim(Prim, KAddr),
+   ApplyList(Option<Box<Val>>, Expr, Env, KAddr),
+   App(Vec<Val>, Vec<Expr>, Env, KAddr),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Var(pub String);
 
+/// which variable we are binding
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Address {
-   /// which variable we are binding
-   /// (this kind of obviates the Env, as itll be Var -> Var, but whatever.)
-   BAddr(Var),
-   /// The expression that created the continuation.
-   KAddr(Expr),
-}
+pub struct BAddr(Var);
+
+/// The expression that created the continuation.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct KAddr(Expr);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Prim(pub String);
 
+impl State {
+   pub fn set_store(self, store: Store) -> Self {
+      match self {
+         State::Eval(EvalState {
+            ctrl, env, kaddr, ..
+         }) => State::Eval(EvalState {
+            ctrl,
+            env,
+            store,
+            kaddr,
+         }),
+         State::Apply(ApplyState { val, kaddr, .. }) => {
+            State::Apply(ApplyState { val, store, kaddr })
+         }
+      }
+   }
+}
+
 impl EvalState {
-   pub fn new(ctrl: Expr, env: Env, store: Store, kaddr: Address) -> EvalState {
+   pub fn new(ctrl: Expr, env: Env, store: Store, kaddr: KAddr) -> EvalState {
       EvalState {
          ctrl,
          env,
@@ -132,19 +149,19 @@ impl EvalState {
 }
 
 impl ApplyState {
-   pub fn new(val: Val, store: Store, kaddr: Address) -> ApplyState {
+   pub fn new(val: Val, store: Store, kaddr: KAddr) -> ApplyState {
       ApplyState { val, store, kaddr }
    }
 }
 
 impl Env {
-   pub fn insert(&self, k: Var, v: Address) -> Env {
+   pub fn insert(&self, k: Var, v: BAddr) -> Env {
       let mut newenv = self.0.clone();
       newenv.insert(k, v);
       Env(newenv)
    }
 
-   pub fn get(&self, var: &Var) -> Option<Address> {
+   pub fn get(&self, var: &Var) -> Option<BAddr> {
       self.0.get(var).cloned()
    }
 }
@@ -158,44 +175,40 @@ impl Store {
    }
 
    /// actually a join operation.
-   pub fn insert(&self, a: Address, v: Val) -> Store {
-      if let Address::BAddr(..) = a {
-         Store {
-            binds: self
-               .binds
-               .update(a.clone(), Val::from_old(self.binds.get(&a), v)),
-            konts: self.konts.clone(),
-         }
-      } else {
-         panic!("Not given a binding-addr with the value. {:?}", a);
+   pub fn insert(&self, a: BAddr, v: Val) -> Store {
+      Store {
+         binds: self
+            .binds
+            .update(a.clone(), Val::from_old(self.binds.get(&a), v)),
+         konts: self.konts.clone(),
       }
    }
 
-   pub fn insertk(&self, a: Address, k: Kont) -> Store {
-      if let Address::KAddr(..) = a {
-         Store {
-            binds: self.binds.clone(),
-            konts: match self.konts.get(&a) {
-               Some(old) => self.konts.update(a, old.clone().update(k)),
-               None => self.konts.update(a, im::HashSet::unit(k)),
-            },
-         }
-      } else {
-         panic!("Not given a kont-addr with the kont. {:?}", k);
+   pub fn insertk(&self, a: KAddr, k: Kont) -> Store {
+      Store {
+         binds: self.binds.clone(),
+         konts: match self.konts.get(&a) {
+            Some(old) => self.konts.update(a, old.clone().update(k)),
+            None => self.konts.update(a, im::HashSet::unit(k)),
+         },
       }
    }
 
-   pub fn get(&self, k: &Address) -> Val {
-      match k {
-         Address::BAddr(..) => self.binds.get(k).cloned().expect("No BAddr found."),
-         Address::KAddr(..) => panic!("Should only be getting Bindings: {:?}", k),
-      }
+   pub fn get(&self, k: &BAddr) -> Val {
+      self.binds.get(k).cloned().expect("No BAddr found.")
    }
 
-   pub fn getk(&self, k: &Address) -> im::HashSet<Kont> {
-      match k {
-         Address::BAddr(..) => panic!("Should only be getting Konts: {:?}", k),
-         Address::KAddr(..) => self.konts.get(k).cloned().expect("No KAddr found."),
+   pub fn getk(&self, k: &KAddr) -> im::HashSet<Kont> {
+      self.konts.get(k).cloned().expect("No KAddr found.")
+   }
+
+   // used to implement the single-threaded global store.
+   pub fn join(self, other: Self) -> Store {
+      Store {
+         binds: self
+            .binds
+            .union_with(other.binds, |v1, v2| Val::from_old(Some(&v1), v2)),
+         konts: self.konts.union_with(other.konts, |v1, v2| v1.union(v2)),
       }
    }
 }
@@ -221,17 +234,15 @@ impl Val {
       }
    }
 
+   /// used to update a value, i.e. when joining values in a store.
    fn from_old(old: Option<&Val>, new: Val) -> Val {
       match old {
          None => new,
          Some(old) => Val {
             closures: old.closures.clone().union(new.closures),
             vals: match (old.vals.clone(), new.vals) {
-               (Err(false), Err(false)) => Err(false),
-               (_, Err(true)) => Err(true),
-               (Err(true), _) => Err(true),
-               (Err(false), nf) => nf,
-               (nf, Err(false)) => nf,
+               (_, Err(true)) | (Err(true), _) => Err(true),
+               (Err(false), nf) | (nf, Err(false)) => nf,
                (Ok(v1), Ok(v2)) => {
                   if v1 == v2 {
                      Ok(v1)
@@ -323,20 +334,18 @@ pub fn matches_boolean(str: &str) -> Option<bool> {
    }
 }
 
-/// Allocates an address for a binding
-/// TODO: actually write these...
-pub fn balloc(v: Var) -> Address {
-   Address::BAddr(v)
+pub fn balloc(v: Var) -> BAddr {
+   BAddr(v)
 }
 
-pub fn kalloc(e: Expr) -> Address {
-   Address::KAddr(e)
+pub fn kalloc(e: Expr) -> KAddr {
+   KAddr(e)
 }
 
-pub fn apply_state(val: Val, store: Store, kaddr: Address) -> State {
+pub fn apply_state(val: Val, store: Store, kaddr: KAddr) -> State {
    State::Apply(ApplyState::new(val, store, kaddr))
 }
 
-pub fn eval_state(ctrl: Expr, env: Env, store: Store, kaddr: Address) -> State {
+pub fn eval_state(ctrl: Expr, env: Env, store: Store, kaddr: KAddr) -> State {
    State::Eval(EvalState::new(ctrl, env, store, kaddr))
 }

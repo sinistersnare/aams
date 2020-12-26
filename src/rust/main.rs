@@ -46,7 +46,9 @@ fn exec_str(program: &str) {
    match parsed {
       Ok((sexpr, _)) => {
          let states = evaluate(sexpr);
-         states.iter().for_each(|s| println!("{:?}\n", s))
+         states
+            .iter()
+            .for_each(|(k, v)| println!("{{{:?} --> {:?}}}\n", k, v))
          // println!("All states: {:#?}", states);
       }
       Err(e) => println!("Error Parsing: {:?}", e),
