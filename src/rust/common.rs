@@ -33,11 +33,29 @@ pub struct Env(pub im::HashMap<Var, Address>);
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Store {
    binds: im::HashMap<Address, Val>,
-   konts: im::HashMap<Address, Kont>,
+   konts: im::HashMap<Address, im::HashSet<Kont>>,
+}
+
+// The way we are doing abstraction of the store is as so
+// the store is Addr -> Val
+// val is the lattice, and we define the `join` operator
+// to update the val if it exists already.
+
+/// An abstract value (cause this is an AAM)
+/// An abstract value is a lattice that can hold a single concrete-value, or be top.
+/// Also, it has a set of closures that it can be.
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+pub struct Val {
+   /// If there is only a single possible val for this, then it is Ok,
+   /// If multiple values are given, its Err(true) for top.
+   /// If no values are given (only ever closures) this is Err(false) for bottom.
+   pub vals: Result<ConcreteVal, bool>,
+   /// The set of closures that that can inhabit this value.
+   pub closures: im::HashSet<Closure>,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub enum Val {
+pub enum ConcreteVal {
    /// Also can be used as end-of-list sentinel value.
    Null,
    /// returned by things like `(set! x e)`, (prim println), etc.
@@ -55,8 +73,9 @@ pub enum Val {
    Boolean(bool),
    /// A quoted S-Expression, which does not evaluate it.
    Quote(Expr),
-   /// a compound object formed from 2 other values
+   /// a compound object formed from 2 values
    /// can be used to implement lists.
+   /// (note how these are abstract values not concrete)
    Cons(Box<Val>, Box<Val>),
 }
 
@@ -91,9 +110,11 @@ pub struct Var(pub String);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Address {
-   // which variable we are binding
-   BAddr(Var, usize),
-   KAddr(Expr, usize),
+   /// which variable we are binding
+   /// (this kind of obviates the Env, as itll be Var -> Var, but whatever.)
+   BAddr(Var),
+   /// The expression that created the continuation.
+   KAddr(Expr),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -136,14 +157,17 @@ impl Store {
       }
    }
 
-   pub fn insert(&self, k: Address, v: Val) -> Store {
-      if let Address::BAddr(..) = k {
+   /// actually a join operation.
+   pub fn insert(&self, a: Address, v: Val) -> Store {
+      if let Address::BAddr(..) = a {
          Store {
-            binds: self.binds.update(k, v),
+            binds: self
+               .binds
+               .update(a.clone(), Val::from_old(self.binds.get(&a), v)),
             konts: self.konts.clone(),
          }
       } else {
-         panic!("Not given a binding-addr with the value. {:?}", k);
+         panic!("Not given a binding-addr with the value. {:?}", a);
       }
    }
 
@@ -151,17 +175,72 @@ impl Store {
       if let Address::KAddr(..) = a {
          Store {
             binds: self.binds.clone(),
-            konts: self.konts.update(a, k),
+            konts: match self.konts.get(&a) {
+               Some(old) => self.konts.update(a, old.clone().update(k)),
+               None => self.konts.update(a, im::HashSet::unit(k)),
+            },
          }
       } else {
          panic!("Not given a kont-addr with the kont. {:?}", k);
       }
    }
 
-   pub fn get(&self, k: &Address) -> Option<Val> {
+   pub fn get(&self, k: &Address) -> Val {
       match k {
-         Address::BAddr(..) => self.binds.get(k).cloned(),
-         Address::KAddr(..) => self.konts.get(k).cloned().map(|k| Val::Kont(k)),
+         Address::BAddr(..) => self.binds.get(k).cloned().expect("No BAddr found."),
+         Address::KAddr(..) => panic!("Should only be getting Bindings: {:?}", k),
+      }
+   }
+
+   pub fn getk(&self, k: &Address) -> im::HashSet<Kont> {
+      match k {
+         Address::BAddr(..) => panic!("Should only be getting Konts: {:?}", k),
+         Address::KAddr(..) => self.konts.get(k).cloned().expect("No KAddr found."),
+      }
+   }
+}
+
+impl Val {
+   pub fn new(cv: ConcreteVal) -> Val {
+      match cv {
+         ConcreteVal::Closure(clo) => Val {
+            closures: im::HashSet::unit(clo),
+            vals: Err(false),
+         },
+         other => Val {
+            closures: im::HashSet::new(),
+            vals: Ok(other),
+         },
+      }
+   }
+
+   pub fn top() -> Val {
+      Val {
+         closures: im::HashSet::new(),
+         vals: Err(true),
+      }
+   }
+
+   fn from_old(old: Option<&Val>, new: Val) -> Val {
+      match old {
+         None => new,
+         Some(old) => Val {
+            closures: old.closures.clone().union(new.closures),
+            vals: match (old.vals.clone(), new.vals) {
+               (Err(false), Err(false)) => Err(false),
+               (_, Err(true)) => Err(true),
+               (Err(true), _) => Err(true),
+               (Err(false), nf) => nf,
+               (nf, Err(false)) => nf,
+               (Ok(v1), Ok(v2)) => {
+                  if v1 == v2 {
+                     Ok(v1)
+                  } else {
+                     Err(true)
+                  }
+               }
+            },
+         },
       }
    }
 }
@@ -184,33 +263,49 @@ impl fmt::Debug for Expr {
    }
 }
 
-pub fn val_is_list(val: &Val) -> bool {
-   if !matches!(val, Val::Cons(_, _)|Val::Null) {
-      return false;
+/// More like 'val may be a list'.
+/// Will tell if a given value can ever be a proper-list, meaning null-terminated.
+/// Some(true) -> Will always be a list
+/// Some(false) -> Will never be a list
+/// None -> Maybe!
+pub fn val_maybe_list(val: &Val) -> Option<bool> {
+   match val.vals {
+      // maybe! Cant hurt to just run more branches!
+      Err(true) => None,
+      // never inhabited by a non-closure value, couldnt be a list.
+      Err(false) => Some(false),
+      Ok(ref v) => {
+         if !matches!(v, ConcreteVal::Cons(_, _) | ConcreteVal::Null) {
+            return Some(false); // the value inhabited wasnt a proper-list.
+         }
+         let mut cur = v;
+         while let ConcreteVal::Cons(_, cdr) = cur {
+            cur = match cdr.vals {
+               // dont know rest of the list
+               Err(true) => {
+                  return None;
+               }
+               // ended by a only-closure, not a proper list.
+               Err(false) => {
+                  return Some(false);
+               }
+               Ok(ref ccdr) => ccdr,
+            }
+         }
+         match cur {
+            ConcreteVal::Null => Some(true),
+            _ => Some(false),
+         }
+      }
    }
-   let mut cur = val;
-   while let Val::Cons(_, cdr) = cur {
-      cur = &*cdr;
-   }
-   matches!(cur, Val::Null)
 }
 
 pub fn make_scm_list(vals: Vec<Val>) -> Val {
-   let mut lst = Val::Null;
+   let mut lst = Val::new(ConcreteVal::Null);
    for v in vals.into_iter().rev() {
-      lst = Val::Cons(Box::new(v), Box::new(lst));
+      lst = Val::new(ConcreteVal::Cons(Box::new(v), Box::new(lst)));
    }
    lst
-}
-
-pub fn scm_list_to_vals(val: Val) -> Vec<Val> {
-   let mut vals = vec![];
-   let mut cur = val;
-   while let Val::Cons(car, cdr) = cur {
-      vals.push(*car);
-      cur = *cdr;
-   }
-   vals
 }
 
 pub fn matches_number(str: &str) -> Option<i64> {
@@ -230,13 +325,12 @@ pub fn matches_boolean(str: &str) -> Option<bool> {
 
 /// Allocates an address for a binding
 /// TODO: actually write these...
-pub fn apply_alloc(_st: &ApplyState, _offset: usize) -> Address {
-   Address::BAddr(Var("WRONG".to_string()), 0)
+pub fn balloc(v: Var) -> Address {
+   Address::BAddr(v)
 }
 
-/// Allocates an address for a continuation
-pub fn eval_alloc(_st: &EvalState, _offset: usize) -> Address {
-   Address::BAddr(Var("WRONG".to_string()), 0)
+pub fn kalloc(e: Expr) -> Address {
+   Address::KAddr(e)
 }
 
 pub fn apply_state(val: Val, store: Store, kaddr: Address) -> State {

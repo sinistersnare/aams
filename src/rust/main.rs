@@ -15,13 +15,12 @@ mod evaluate;
 mod prims;
 mod read;
 
-use crate::common::State;
 use crate::evaluate::evaluate;
 use crate::read::parse_expr;
 
 fn main() {
    if let Some(filename) = env::args().nth(1) {
-      exec_string(&fs::read_to_string(filename).expect("Could not read file"))
+      exec_str(&fs::read_to_string(filename).expect("Could not read file"))
    } else {
       start_repl();
    };
@@ -37,21 +36,18 @@ fn start_repl() {
       stdin()
          .read_line(&mut input)
          .expect("Did not enter a full string.");
-      exec_string(&input);
+      exec_str(&input);
       input.clear();
    }
 }
 
-fn exec_string(program: &str) {
+fn exec_str(program: &str) {
    let parsed = parse_expr(program.trim());
    match parsed {
       Ok((sexpr, _)) => {
          let states = evaluate(sexpr);
-         let fin_state = states.last().unwrap();
-         match fin_state {
-            State::Eval(e) => panic!("Howd we end with eval? {:?}", e),
-            State::Apply(v) => println!("{:?}", v.val),
-         }
+         states.iter().for_each(|s| println!("{:?}\n", s))
+         // println!("All states: {:#?}", states);
       }
       Err(e) => println!("Error Parsing: {:?}", e),
    };

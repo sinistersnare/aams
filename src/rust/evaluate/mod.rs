@@ -9,30 +9,40 @@ use crate::common::{eval_state, Address, Env, Expr, Kont, State, Store};
 use apply::apply_step;
 use eval::eval_step;
 
+use std::iter::FromIterator;
+
 fn inject(ctrl: Expr) -> State {
    eval_state(
       ctrl,
       Env(im::HashMap::new()),
-      Store::new().insertk(Address::KAddr(Expr::Atom("".to_string()), 0), Kont::Empty),
-      Address::KAddr(Expr::Atom("".to_string()), 0),
+      Store::new().insertk(Address::KAddr(Expr::Atom("".to_string())), Kont::Empty),
+      Address::KAddr(Expr::Atom("".to_string())),
    )
 }
 
-pub fn step(st: &State) -> State {
+pub fn step(st: &State) -> im::HashSet<State> {
    match st {
-      State::Eval(eval_state) => eval_step(eval_state),
+      State::Eval(eval_state) => im::HashSet::unit(eval_step(eval_state)),
       State::Apply(apply_state) => apply_step(apply_state),
    }
 }
 
-pub fn evaluate(ctrl: Expr) -> Vec<State> {
-   let mut st0 = inject(ctrl);
-   let mut stepped = step(&st0);
-   let mut states = vec![st0.clone(), stepped.clone()];
-   while st0 != stepped {
-      st0 = stepped;
-      stepped = step(&st0);
-      states.push(stepped.clone());
+pub fn evaluate(ctrl: Expr) -> im::HashSet<State> {
+   search(im::HashSet::new(), im::Vector::unit(inject(ctrl)))
+}
+
+fn search(seen: im::HashSet<State>, mut todo: im::Vector<State>) -> im::HashSet<State> {
+   if todo.is_empty() {
+      seen
+   } else {
+      let head = todo.remove(0);
+      if seen.contains(&head) {
+         search(seen, todo)
+      } else {
+         search(
+            seen.update(head.clone()),
+            im::Vector::from_iter(step(&head).into_iter()) + todo,
+         )
+      }
    }
-   states
 }
