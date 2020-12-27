@@ -12,11 +12,12 @@ use eval::eval_step;
 use std::iter::FromIterator;
 
 fn inject(ctrl: Expr) -> State {
+   let addr0 = kalloc(Expr::Atom("".to_string()), Env::new());
    eval_state(
       ctrl,
-      Env(im::HashMap::new()),
-      Store::new().insertk(kalloc(Expr::Atom("".to_string())), Kont::Empty),
-      kalloc(Expr::Atom("".to_string())),
+      Env::new(),
+      Store::new().insertk(addr0.clone(), Kont::Empty),
+      addr0,
    )
 }
 

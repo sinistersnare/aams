@@ -42,21 +42,21 @@ fn handle_if_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
 
 fn handle_let_kont(k: Kont, st: &ApplyState) -> State {
    let ApplyState { val, store, .. } = st.clone();
-   if let Kont::Let(vars, mut done, mut todo, eb, letenv, next_kaddr) = k {
+   if let Kont::Let(ctx, vars, mut done, mut todo, eb, letenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
          let mut next_env = letenv;
          let mut next_store = store;
          for (bndvar, val) in vars.iter().zip(done.iter()) {
-            let addr = balloc(bndvar.clone());
+            let addr = balloc(bndvar.clone(), ctx.clone());
             next_env = next_env.insert(bndvar.clone(), addr.clone());
             next_store = next_store.insert(addr, val.clone());
          }
          eval_state(eb, next_env, next_store, next_kaddr)
       } else {
          let head = todo.remove(0);
-         let next_next_kaddr = kalloc(head.clone());
-         let next_k = Kont::Let(vars, done, todo, eb, letenv.clone(), next_kaddr);
+         let next_next_kaddr = kalloc(head.clone(), letenv.clone());
+         let next_k = Kont::Let(ctx, vars, done, todo, eb, letenv.clone(), next_kaddr);
          let next_store = store.insertk(next_next_kaddr.clone(), next_k);
          eval_state(head, letenv, next_store, next_next_kaddr)
       }
@@ -74,7 +74,7 @@ fn handle_prim_kont(k: Kont, st: &ApplyState) -> State {
          apply_state(val, store, next_kaddr)
       } else {
          let head = todo.remove(0);
-         let next_next_kaddr = kalloc(head.clone());
+         let next_next_kaddr = kalloc(head.clone(), primenv.clone());
          let next_k = Kont::Prim(op, done, todo, primenv.clone(), next_kaddr);
          let next_store = store.insertk(next_next_kaddr.clone(), next_k);
          eval_state(head, primenv, next_store, next_next_kaddr)
@@ -99,7 +99,7 @@ fn handle_apply_prim_kont(k: Kont, st: &ApplyState) -> State {
 
 fn handle_callcc_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
    let ApplyState { val, store, .. } = st.clone();
-   if let Kont::Callcc(ref next_kaddr) = k {
+   if let Kont::Callcc(ref ctx, ref next_kaddr) = k {
       // TODO: do I just ignore the possible values in `val.vals`? And deal only with `.closures`?
       // And what do I do about the (call/cc k) case??? if k is top, then WUTDO???
       // ugh
@@ -115,7 +115,7 @@ fn handle_callcc_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                         panic!("call/cc lambda only takes 1 argument!");
                      }
                      let parameter = params.remove(0);
-                     let addr = balloc(parameter.clone());
+                     let addr = balloc(parameter.clone(), ctx.clone());
                      let next_ks = store.getk(next_kaddr);
                      next_ks
                         .into_iter()
@@ -164,7 +164,7 @@ fn handle_set_bang_kont(k: Kont, st: &ApplyState) -> State {
 fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
    let ApplyState { val, store, .. } = st.clone();
    // todo `(apply k (list arg))` support? (applying a kont with a list?)
-   if let Kont::ApplyList(maybe_func, arglist, applyenv, next_kaddr) = k {
+   if let Kont::ApplyList(ctx, maybe_func, arglist, applyenv, next_kaddr) = k {
       match maybe_func {
          Some(func) => {
             if matches!(val_maybe_list(&val), Some(false)) {
@@ -199,7 +199,7 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                                  panic!("Not enough args. given {:?}", other);
                               }
                            };
-                           let addr = balloc(expected.clone());
+                           let addr = balloc(expected.clone(), ctx.clone());
                            next_env = next_env.insert(expected, addr.clone());
                            next_store = next_store.insert(addr, argval);
                            cur = match cur.vals {
@@ -213,7 +213,7 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                         eval_state(body, next_env, next_store, next_kaddr.clone())
                      }
                      Closure(CloType::VarArg(arg), body, cloenv) => {
-                        let addr = balloc(arg.clone());
+                        let addr = balloc(arg.clone(), ctx.clone());
                         let next_env = cloenv.insert(arg, addr.clone());
                         let next_store = store.insert(addr, val.clone());
                         eval_state(body, next_env, next_store, next_kaddr.clone())
@@ -222,8 +222,9 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                })
          }
          None => {
-            let next_next_kaddr = kalloc(arglist.clone());
+            let next_next_kaddr = kalloc(arglist.clone(), applyenv.clone());
             let next_k = Kont::ApplyList(
+               ctx,
                Some(Box::new(val)),
                Expr::Atom("".into()),
                applyenv.clone(),
@@ -241,7 +242,7 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
 // regular untagged application.
 fn handle_app(k: Kont, st: &ApplyState) -> im::HashSet<State> {
    let ApplyState { val, store, .. } = st.clone();
-   if let Kont::App(mut done, mut todo, appenv, next_kaddr) = k {
+   if let Kont::App(ctx, mut done, mut todo, appenv, next_kaddr) = k {
       done.push(val);
       if todo.is_empty() {
          let headfn = done.remove(0);
@@ -260,7 +261,7 @@ fn handle_app(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                         let mut next_env = cloenv;
                         let mut next_store = store.clone();
                         for (param, arg) in params.iter().zip(args.iter()) {
-                           let addr = balloc(param.clone());
+                           let addr = balloc(param.clone(), ctx.clone());
                            next_env = next_env.insert(param.clone(), addr.clone());
                            next_store = next_store.insert(addr, arg.clone());
                         }
@@ -268,7 +269,7 @@ fn handle_app(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                      }
                      CloType::VarArg(vararg) => {
                         let scm_list = make_scm_list(args.clone());
-                        let addr = balloc(vararg.clone());
+                        let addr = balloc(vararg.clone(), ctx.clone());
                         let next_env = cloenv.insert(vararg, addr.clone());
                         let next_store = store.insert(addr, scm_list);
                         eval_state(body, next_env, next_store, next_kaddr.clone())
@@ -296,8 +297,8 @@ fn handle_app(k: Kont, st: &ApplyState) -> im::HashSet<State> {
             })
       } else {
          let head = todo.remove(0);
-         let next_next_kaddr = kalloc(head.clone());
-         let next_kont = Kont::App(done, todo, appenv.clone(), next_kaddr);
+         let next_next_kaddr = kalloc(head.clone(), appenv.clone());
+         let next_kont = Kont::App(ctx, done, todo, appenv.clone(), next_kaddr);
          let next_store = store.insertk(next_next_kaddr.clone(), next_kont);
          im::HashSet::unit(eval_state(head, appenv, next_store, next_next_kaddr))
       }

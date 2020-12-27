@@ -65,7 +65,7 @@ fn handle_prim_expr(prim: Prim, mut args: Vec<Expr>, st: &EvalState) -> State {
       apply_state(val, store, kaddr)
    } else {
       let arg0 = args.remove(0);
-      let next_kaddr = kalloc(ctrl);
+      let next_kaddr = kalloc(ctrl, env.clone());
       let next_k = Kont::Prim(
          prim,
          Vec::with_capacity(args.len()),
@@ -94,8 +94,16 @@ fn handle_let_expr(vars: Vec<Var>, mut exprs: Vec<Expr>, eb: Expr, st: &EvalStat
    } else {
       let e0 = exprs.remove(0);
       let rest = exprs;
-      let next_kaddr = kalloc(ctrl);
-      let next_k = Kont::Let(vars, Vec::with_capacity(len), rest, eb, env.clone(), kaddr);
+      let next_kaddr = kalloc(ctrl.clone(), env.clone());
+      let next_k = Kont::Let(
+         ctrl,
+         vars,
+         Vec::with_capacity(len),
+         rest,
+         eb,
+         env.clone(),
+         kaddr,
+      );
       let next_store = store.insertk(next_kaddr.clone(), next_k);
       eval_state(e0, env, next_store, next_kaddr)
    }
@@ -112,8 +120,14 @@ fn handle_function_application_expr(list: &[Expr], st: &EvalState) -> State {
    let mut args = list.to_vec();
    let func = args.remove(0);
 
-   let next_kaddr = kalloc(ctrl);
-   let next_k = Kont::App(Vec::with_capacity(list.len()), args, env.clone(), kaddr);
+   let next_kaddr = kalloc(ctrl.clone(), env.clone());
+   let next_k = Kont::App(
+      ctrl,
+      Vec::with_capacity(list.len()),
+      args,
+      env.clone(),
+      kaddr,
+   );
    let next_store = store.insertk(next_kaddr.clone(), next_k);
    eval_state(func, env, next_store, next_kaddr)
 }
@@ -132,31 +146,31 @@ pub fn eval_step(st: &EvalState) -> State {
       match ctrl {
          Expr::List(ref list) => {
             if let Some((ec, et, ef)) = matches_if_expr(list) {
-               let next_kaddr = kalloc(ctrl.clone());
+               let next_kaddr = kalloc(ctrl.clone(), env.clone());
                let next_k = Kont::If(et, ef, env.clone(), kaddr);
                let next_store = store.insertk(next_kaddr.clone(), next_k);
                eval_state(ec, env, next_store, next_kaddr)
             } else if let Some((vars, exprs, eb)) = matches_let_expr(list) {
                handle_let_expr(vars, exprs, eb, st)
             } else if let Some((ef, ex)) = matches_apply_expr(list) {
-               let next_kaddr = kalloc(ctrl.clone());
-               let next_k = Kont::ApplyList(None, ex, env.clone(), kaddr);
+               let next_kaddr = kalloc(ctrl.clone(), env.clone());
+               let next_k = Kont::ApplyList(ctrl.clone(), None, ex, env.clone(), kaddr);
                let next_store = store.insertk(next_kaddr.clone(), next_k);
                eval_state(ef, env, next_store, next_kaddr)
             } else if let Some((prim, args)) = matches_prim_expr(list) {
                handle_prim_expr(prim, args, st)
             } else if let Some((prim, listexpr)) = matches_apply_prim_expr(list) {
-               let next_kaddr = kalloc(ctrl.clone());
+               let next_kaddr = kalloc(ctrl.clone(), env.clone());
                let next_k = Kont::ApplyPrim(prim, kaddr);
                let next_store = store.insertk(next_kaddr.clone(), next_k);
                eval_state(listexpr, env, next_store, next_kaddr)
             } else if let Some(e) = matches_callcc_expr(list) {
-               let next_kaddr = kalloc(ctrl.clone());
-               let next_k = Kont::Callcc(kaddr);
+               let next_kaddr = kalloc(ctrl.clone(), env.clone());
+               let next_k = Kont::Callcc(ctrl.clone(), kaddr);
                let next_store = store.insertk(next_kaddr.clone(), next_k);
                eval_state(e, env, next_store, next_kaddr)
             } else if let Some((var, e)) = matches_setbang_expr(list) {
-               let next_kaddr = kalloc(ctrl.clone());
+               let next_kaddr = kalloc(ctrl.clone(), env.clone());
                let next_k = Kont::Set(env.get(&var).expect("no var"), kaddr);
                let next_store = store.insertk(next_kaddr.clone(), next_k);
                eval_state(e, env, next_store, next_kaddr)

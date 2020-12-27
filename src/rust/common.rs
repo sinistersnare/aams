@@ -28,7 +28,7 @@ pub enum Expr {
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Env(pub im::HashMap<Var, BAddr>);
+pub struct Env(im::HashMap<Var, BAddr>);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Store {
@@ -94,27 +94,50 @@ pub enum Kont {
    Empty,
    /// a conditional
    If(Expr, Expr, Env, KAddr),
-   /// A let binding continuation
-   /// After each Expr in
-   Let(Vec<Var>, Vec<Val>, Vec<Expr>, Expr, Env, KAddr),
-   Callcc(KAddr),
+   /// The context for the application,
+   /// The variables we are gonna bind
+   /// The evaluated bindings
+   /// The unevaluated bindings
+   /// The body expression to use after we bind everything
+   /// The environment to evaluate arguments and to expand after we do the bindings.
+   /// The next continuation after the function is applied.
+   Let(Expr, Vec<Var>, Vec<Val>, Vec<Expr>, Expr, Env, KAddr),
+   /// The context for the call/cc
+   /// The next continuation after the function is applied.
+   Callcc(Expr, KAddr),
    Set(BAddr, KAddr),
    Prim(Prim, Vec<Val>, Vec<Expr>, Env, KAddr),
    ApplyPrim(Prim, KAddr),
-   ApplyList(Option<Box<Val>>, Expr, Env, KAddr),
-   App(Vec<Val>, Vec<Expr>, Env, KAddr),
+   /// The context for the application,
+   /// if None then we are evaluating the fn, if Some, then we are evaluating the arg.
+   /// The unevaluated Arg. (todo: we could cheat and use a Result? make it slimmer)
+   /// The environment to evaluate arguments
+   /// The next continuation after the function is applied.
+   ApplyList(Expr, Option<Box<Val>>, Expr, Env, KAddr),
+   /// The context for the application,
+   /// The evaluated arguments
+   /// The unevaluated arguments
+   /// The environment to evaluate arguments
+   /// The next continuation after the function is applied.
+   App(Expr, Vec<Val>, Vec<Expr>, Env, KAddr),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Var(pub String);
 
-/// which variable we are binding
+/// 1-CFA compatible address for value bindings.
+/// The Var is the variable we are binding
+/// The Expr is the most recent call site
+/// in a k-CFA, we would use the last k call-sites.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct BAddr(Var);
+pub struct BAddr(Var, Expr);
 
-/// The expression that created the continuation.
+/// P4F continuation binding for perfect control flow precision.
+/// See Gilray et al. 'Pushdown Control-Flow Analysis For Free' for info
+/// The Expr is the expression that we are returning to,
+/// The Env is the env of that call-site.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct KAddr(Expr);
+pub struct KAddr(Expr, Env);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Prim(pub String);
@@ -155,6 +178,10 @@ impl ApplyState {
 }
 
 impl Env {
+   pub fn new() -> Env {
+      Env(im::HashMap::new())
+   }
+
    pub fn insert(&self, k: Var, v: BAddr) -> Env {
       let mut newenv = self.0.clone();
       newenv.insert(k, v);
@@ -334,12 +361,12 @@ pub fn matches_boolean(str: &str) -> Option<bool> {
    }
 }
 
-pub fn balloc(v: Var) -> BAddr {
-   BAddr(v)
+pub fn balloc(v: Var, e: Expr) -> BAddr {
+   BAddr(v, e)
 }
 
-pub fn kalloc(e: Expr) -> KAddr {
-   KAddr(e)
+pub fn kalloc(e: Expr, env: Env) -> KAddr {
+   KAddr(e, env)
 }
 
 pub fn apply_state(val: Val, store: Store, kaddr: KAddr) -> State {
