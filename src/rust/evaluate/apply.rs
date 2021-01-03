@@ -11,29 +11,35 @@ use crate::prims::apply_prim;
 
 fn handle_if_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
    let ApplyState { val, store, .. } = st.clone();
+
    if let Kont::If(et, ef, ifenv, next_kaddr) = k {
-      match val.vals {
-         Ok(cv) => {
-            if cv == ConcreteVal::Boolean(false) {
-               im::HashSet::unit(eval_state(ef, ifenv, store, next_kaddr))
-            } else {
-               im::HashSet::unit(eval_state(et, ifenv, store, next_kaddr))
-            }
+      let fals = im::HashSet::unit(eval_state(
+         ef,
+         ifenv.clone(),
+         store.clone(),
+         next_kaddr.clone(),
+      ));
+      let tru = im::HashSet::unit(eval_state(et, ifenv, store, next_kaddr));
+      let both = fals.clone().union(tru.clone());
+
+      // we are able to run the false branch only when we only ever see #f
+      // we are able to run the true branch only when we never could see #f
+      // otherwise, run both.
+      if let Ok(ConcreteVal::Boolean(false)) = val.vals {
+         // if its false but we have closures too, then we need both branches.
+         if val.closures.is_empty() {
+            fals
+         } else {
+            both
          }
-         Err(false) => {
-            // closures are truthy!
-            im::HashSet::unit(eval_state(et, ifenv, store, next_kaddr))
-         }
-         Err(true) => {
-            // in the `top` case we need to run both branches.
-            im::HashSet::unit(eval_state(
-               et,
-               ifenv.clone(),
-               store.clone(),
-               next_kaddr.clone(),
-            ))
-            .union(im::HashSet::unit(eval_state(ef, ifenv, store, next_kaddr)))
-         }
+      } else if let Ok(..) = val.vals {
+         tru
+      } else if let Err(false) = val.vals {
+         // in bottom, we only have closures, which are truthy.
+         tru
+      } else {
+         // only case left is top, we need to run both.
+         both
       }
    } else {
       panic!("Given Wrong Kontinuation");
@@ -74,6 +80,7 @@ fn handle_prim_kont(k: Kont, st: &ApplyState) -> State {
          apply_state(val, store, next_kaddr)
       } else {
          let head = todo.remove(0);
+         // TODO: should I use the same control here? AKA same kaddr?
          let next_next_kaddr = kalloc(head.clone(), primenv.clone());
          let next_k = Kont::Prim(op, done, todo, primenv.clone(), next_kaddr);
          let next_store = store.insertk(next_next_kaddr.clone(), next_k);
@@ -222,6 +229,7 @@ fn handle_apply_list_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
                })
          }
          None => {
+            // TODO: should this be the ctx? AKA same kaddr as the original Kont::ApplyList?
             let next_next_kaddr = kalloc(arglist.clone(), applyenv.clone());
             let next_k = Kont::ApplyList(
                ctx,
