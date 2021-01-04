@@ -113,9 +113,7 @@ $\mathcal{I}(e) \triangleq E\langle e , \varnothing , \varnothing , \{(0, 0) : \
 %%%%%%%%%%%%%%%%%%%%%%%%% STORE JOIN SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   \textbf{Store Joining:} \\
-  $\sigma \sqcup [a \mapsto v] \triangleq \sigma[a \mapsto v]$ \\
-  $\sigma_\kappa \sqcup [a_\kappa \mapsto \kappa] \triangleq
-  \sigma_\kappa[a_\kappa \mapsto \kappa]$
+  $\store \sqcup [a \mapsto v] \triangleq \store[a \mapsto v]$ \\
 \end{center}
 %%%%%%%%%%%%%%%%%%%%%%%%% COLLECTING SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
@@ -633,7 +631,8 @@ Rules for when the control is a value
 \newcommand{\akont}[0]{\hat{\kappa}}
 \newcommand{\ectrl}[0]{e_{\hat{\varsigma}}}
 \newcommand{\adone}[0]{\widehat{done}}
-
+\newcommand{\actrladdr}[0]{\hat{a}_{\kappa\varsigma}}
+\newcommand{\actrlkont}[0]{\kappa_{\varsigma}}
 
 \newpage
 \section{Abstract Semantics of Scheme}
@@ -664,12 +663,12 @@ Rules for when the control is a value
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ABSTRACT STORE %%%%%%%%%%%%%%%%%%%%%%%%%
     \astore \in \widehat{\textit{Store}}
     &\triangleq \widehat{\textit{BAddr}} \rightharpoonup \widehat{\textit{Val}} \\
-    &\times \widehat{KAddr} \rightharpoonup \widehat{\textit{Kont}} \\
+    &\times \widehat{KAddr} \rightharpoonup \mathcal{P}(\widehat{\textit{Kont}}) \\
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ABSTRACT VALUE %%%%%%%%%%%%%%%%%%%%%%%%%
     \aval \in \widehat{\textit{Val}} &\triangleq
                                        (\widehat{\textit{CVal}} + \top + \bot)
                                        \times \mathcal{P}(\widehat{\textit{Clo}}) \\
-    \aval \in \widehat{\textit{CVal}}
+    \hat{cv} \in \widehat{\textit{CVal}}
     &\triangleq \widehat{\textit{Kont}} + \mathbb{Z} \\
     &+ \{\truesyn , \falsesyn , \textit{Null} , \textit{Void}\} \\
     &+ \{\textbf{quote}(e) , \textbf{cons}(\aval, \aval)\} \\
@@ -693,9 +692,9 @@ Rules for when the control is a value
   \vspace{-7mm}
   \begin{align*}
     \mathcal{A}(E\langle lam , \aenv , ... \rangle)
-    &\triangleq \{ (lam , \aenv) \} \\
+    &\triangleq (\bot , \{(lam , \aenv)\}) \\
     \mathcal{A}(\mae)
-    &\triangleq \{\mae\} \\
+    &\triangleq (\mae , \emptyset) \\
   \end{align*}
   %%%%%%%%%%%%%%%%%%%%%%%%%
   %%%%% COLUMN BREAK %%%%%%
@@ -710,7 +709,7 @@ Rules for when the control is a value
     \hat{\kappa} \in \widehat{\textit{Kont}}
     &::= \textbf{mt} \\
     &|\; \textbf{ifk}(e, e, \aenv, \akaddr) \\
-    &|\; \textbf{letk}(e, vars, \adone, todo, e \aenv, \akaddr) \\
+    &|\; \textbf{letk}(e, vars, \adone, todo, e , \aenv, \akaddr) \\
     &|\; \textbf{callcck}(e, \akaddr) \\
     &|\; \textbf{setk}(\abaddr, \akaddr) \\
     &|\; \textbf{primk}(op, \adone, todo, \aenv, \akaddr) \\
@@ -719,20 +718,40 @@ Rules for when the control is a value
     &|\; \textbf{appappk}(e, \aval?, e, \aenv, \akaddr) \\
   \end{align*}
   \begin{center}
-    \textbf{Tick/Alloc:}
+    \textbf{Allocation:}
   \end{center}
   \vspace{-7mm}
   \begin{align*}
-    \widehat{tick}:\widehat{\Sigma}
-    &\times \widehat{\textit{Kont}} \rightarrow \widehat{\textit{Time}} \\
-    \widehat{tick}(\hat{\varsigma}, \hat{\kappa}) &\triangleq 0 \\
-    \widehat{alloc}:\hat{\Sigma}
-    &\times \widehat{\textit{Kont}} \rightarrow \widehat{\textit{Addr}} \\
-    \widehat{alloc}(\hat{\varsigma}, \hat{\kappa}) &\triangleq 0 \\
+    \widehat{balloc}:\textsf{Var} \times \textsf{Expr} &\rightarrow \widehat{\textit{BAddr}} \\
+    \widehat{balloc}(x, e) &\triangleq (x, e) \\
+    \widehat{kalloc}:\textsf{Expr} \times \widehat{\textit{Env}} &\rightarrow \widehat{\textit{KAddr}} \\
+    \widehat{kalloc}(e, \hat{\rho}) &\triangleq (e, \hat{\rho}) \\
   \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%% STORE JOIN SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    \textbf{Store Joining:} \\
+    $\;\store \sqcup [\akaddr \mapsto \akont]
+    \triangleq \store[\akaddr \mapsto \store(\akaddr) \cup \{\akont\}]$ \\
+    $\store \sqcup [a \mapsto (\hat{cv}_i, \widehat{clo}_i)] \triangleq$ \\
+    match on $\store[a]$
+  \end{center}
+  \[
+    \store[a \mapsto \begin{cases}
+      \texttt{empty}
+      & (\hat{cv}_i, \widehat{clo}_i) \\
+      (\bot, \widehat{clo}_e)
+      & (\hat{cv}_i , \widehat{clo}_i \cup \widehat{clo}_e) \\
+      (\hat{cv}_e, \widehat{clo}_e) \\
+      \;\;\; \land \; \hat{cv}_i = \bot
+      & (\hat{cv}_e , \widehat{clo}_i \cup \widehat{clo}_e)) \\
+      (\hat{cv}_e , \widehat{clo}_e) \\
+      \;\;\; \land \; \hat{cv}_i = \hat{cv}_e
+      & (\hat{cv}_i , \widehat{clo}_i \cup \widehat{clo}_e) \\
+      (\_, \widehat{clo}_e)
+      & (\top , \widehat{clo}_i \cup \widehat{clo}_e) \\
+    \end{cases}]
+  \]
 \end{multicols*}
-
-
 
 \newpage
 
@@ -749,18 +768,18 @@ Rules for when the control is a value
 \textbf{Abstract Eval Rules} \\
 Rules for when the control is an expression \\
 \vspace{2mm}
-$\hat{\varsigma} = E\langle \ectrl , \aenv , \astore , \akaddr \rangle$ \\
+$\hat{\varsigma} = \E{\ectrl}{\aenv}{\astore}{\akaddr}$ \\
 Proceed by matching on $\ectrl$ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%
 \vspace{2mm}
-$\mae \leadsto A\langle \aval , \astore , \akaddr \rangle$ \\
+$\mae \leadsto \A{\aval}{\astore}{\akaddr}$ \\
 where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 \end{center}
 ]
 %%%%%%%%%%%%%%%%%%%%%%%%% IF EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $ \ifsyn{e_c}{e_t}{e_f} $
-  $\leadsto E\langle e_c , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e_c}{\aenv}{\astore'}{\akaddr}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -771,12 +790,12 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION NO ARGSVALS %%%%%%%%%%%%%%%%%%%
 \begin{center}
   $(\texttt{let}\;()\;e_b)$
-  $\leadsto E\langle e_b , \aenv , \astore , \akaddr \rangle$
+  $\leadsto \E{e_b}{\aenv}{\astore}{\akaddr}$
 \end{center}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION VALS GOT ARGS %%%%%%%%%%%%%%%
 \begin{center}
   $(\texttt{let}\;bnds\;e_b)$
-  $\leadsto E\langle e_0 , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e_0}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -790,7 +809,7 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\callccsyn{e}$
-  $\leadsto E\langle e , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -802,7 +821,7 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% SET EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\setsyn{x}{e}$
-  $\leadsto E\langle e , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -826,7 +845,7 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% PRIM NO ARG EXPRESSION %%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\singleprimsyn{op}$
-  $\leadsto A\langle \aval , \astore , \akaddr \rangle$
+  $\leadsto \A{\aval}{\astore}{\akaddr}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -835,7 +854,7 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% PRIM WITH ARGS EXPRESSION %%%%%%%%%%%%%%%%
 \begin{center}
   $\primsyn{op}{e_0\;e_s}$
-  $\leadsto E\langle e_0 , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e_0}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -847,7 +866,7 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM EXPRESSION %%%%%%%%%%%%%%%%
 \begin{center}
   $\applyprimsyn{op}{e}$
-  $\leadsto E\langle e , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -859,19 +878,19 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY FUNCTION LIST EXPRESSION %%%%%%%%%%%%%%%%
 \begin{center}
   $\applysyn{e_f}{e_x}$
-  $\leadsto E\langle e_f , \aenv , \astore' \akaddr' \rangle$
+  $\leadsto \E{e_f}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
   \akaddr' &\triangleq \akalloc{\ectrl , \aenv} \\
-  \akont &\triangleq \textbf{appappk}(\ectrl , \varnothing , e_x , \aenv , \akaddr) \\
+  \akont &\triangleq \textbf{appappk}(\ectrl,\varnothing , e_x , \aenv , \akaddr) \\
   \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \akont]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION EXPRESSION %%%%%%%%%%%%%%%%
 \begin{center}
   $(e_f\;e_s\;...)$
-  $\leadsto E\langle e_f , \aenv , \astore' , \akaddr' \rangle$
+  $\leadsto \E{e_f}{\aenv}{\astore'}{\akaddr'}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -896,9 +915,9 @@ where $\aval \triangleq \hat{\mathcal{A}}(\hat{\varsigma})$
 \begin{center}
 \textbf{Apply Rules} \\
 Rules for when the control is a value \\
-$\hat{\varsigma} = A\langle \aval , \astore , \akaddr \rangle$ \\
-$\akont \in \astore(\akaddr) $ \\
-Proceed by matching on $\akont$ \\
+$\hat{\varsigma} = A\langle \aval , \astore , \actrladdr \rangle$ \\
+$\actrlkont \in \astore(\actrladdr) $ \\
+Proceed by matching on $\actrlkont$ \\
 %%%%%%%%%%%%%%%%%%%%%%%%% EMPTY KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{5mm}
 $\textbf{mt} \leadsto \emptyset$
@@ -907,8 +926,8 @@ $\textbf{mt} \leadsto \emptyset$
 ]
 %%%%%%%%%%%%%%%%%%%%%%%%% IF KONT FALSE %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{ifk}(\_ , e_f, \aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_f , \aenv_{\akont} , \astore , \akaddr' \rangle\}$
+  $\textbf{ifk}(\_ , e_f, \aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_f}{\aenv_{\akont}}{\astore}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -916,8 +935,8 @@ $\textbf{mt} \leadsto \emptyset$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% IF KONT TRUE %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{ifk}(e_t , \_ , \aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_t , \aenv_{\akont} , \astore , \akaddr' \rangle\}$
+  $\textbf{ifk}(e_t , \_ , \aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_t}{\aenv_{\akont}}{\astore}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -925,9 +944,9 @@ $\textbf{mt} \leadsto \emptyset$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% IF KONT BOTH %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{ifk}(e_t , e_f , \aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_t , \aenv_{\akont} , \astore , \akaddr' \rangle\ ,
-              E\langle e_f , \aenv_{\akont} , \astore , \akaddr' \rangle\}$
+  $\textbf{ifk}(e_t , e_f , \aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_t}{\aenv_{\akont}}{\astore}{\akaddr},
+              \E{e_f}{\aenv_{\akont}}{\astore}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -935,8 +954,8 @@ $\textbf{mt} \leadsto \emptyset$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET KONT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{letk}(\ectrl, vars, \adone, [\;], e_b,\aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_b , \aenv_{\akont} , \astore' , \akaddr' \rangle\}$
+  $\textbf{letk}(\ectrl, vars, \adone, [\;], e_b,\aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_b}{\aenv_{\akont}'}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -950,21 +969,21 @@ $\textbf{mt} \leadsto \emptyset$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% LET KONT MORE TODO %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{letk}(\ectrl , vars , \adone , e_h::e_t , e_b,\aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_h , \aenv_{\akont} , \astore' , \akaddr'' \rangle\}$
+  $\textbf{letk}(\ectrl , vars , \adone , e_h::e_t , e_b,\aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_h}{\aenv_{\akont}}{\astore'}{\akaddr'}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \akaddr'' &\triangleq \akalloc(\ectrl, \aenv_{\akont}) \\
-  \akont' &\triangleq \textbf{letk}(\ectrl, vars , \adone \mdoubleplus [\aval], \\
-  &\;\;\;\;\;\;\;\;\;\;\;\;\;\, e_t , e_b , \aenv_{\akont} , \akaddr') \\
-  \astore' &\triangleq \astore \sqcup [\akaddr'' \mapsto \akont']
+  \akaddr' &\triangleq \akalloc{\ectrl, \aenv_{\akont}} \\
+  \akont &\triangleq \textbf{letk}(\ectrl, vars , \adone \mdoubleplus [\aval], \\
+  &\;\;\;\;\;\;\;\;\;\;\;\;\;\, e_t , e_b , \aenv_{\akont} , \akaddr) \\
+  \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \akont]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{setk}(\abaddr , \akaddr')$
-  $\leadsto \{A\langle \textit{Void} , \astore' , \akaddr' \rangle\}$
+  $\textbf{setk}(\abaddr , \akaddr)$
+  $\leadsto \{\A{(\textit{Void} , \emptyset)}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -984,33 +1003,33 @@ $\textbf{mt} \leadsto \emptyset$
 
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC MULTIARG KONT %%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{callcck}(\ectrl , \akaddr')$
-  $\leadsto \{E\langle e_b , \aenv_{\lambda} , \astore' , \akaddr' \rangle\}$
+  $\textbf{callcck}(\ectrl , \akaddr)$
+  $\leadsto \{\E{e_b}{\aenv_{\lambda}'}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
   \aval &\ni (\_ , (\singlelamsyn{x}{e_b} , \aenv_{\lambda})) \\
   \abaddr &\triangleq \aballoc{x , \ectrl} \\
-  \akont' &\triangleq \astore(\akaddr') \\
+  \akont &\in \astore(\akaddr) \\
   \aenv_{\lambda}' &\triangleq \aenv_{\lambda}[x \mapsto \abaddr] \\
-  \astore' &\triangleq \astore \sqcup [\abaddr \mapsto \akont']
+  \astore' &\triangleq \astore \sqcup [\abaddr \mapsto \akont]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\textbf{callcck}(\_, \_)$
-  $\leadsto \{A\langle \akont , \astore' , \akaddr \rangle\}$
+  $\leadsto \{\A{\actrlkont}{\astore'}{\actrladdr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \aval &= (\akont' , \_) \\
-  \astore' &\triangleq \astore \sqcup [\akaddr \mapsto \akont']
+  \aval &= (\akont , \_) \\
+  \astore' &\triangleq \astore \sqcup [\actrladdr \mapsto \akont]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appprimk}(op, \akaddr')$
-  $\leadsto \{A\langle \aval' , \astore , \akaddr' \rangle\}$
+  $\textbf{appprimk}(op, \akaddr)$
+  $\leadsto \{\A{\aval'}{\astore}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -1018,8 +1037,8 @@ $\textbf{mt} \leadsto \emptyset$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% PRIM KONT DONE %%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{primk}(op, \adone, [\;], \_, \akaddr')$
-  $\leadsto \{A\langle \aval' , \astore \akaddr' \rangle\}$
+  $\textbf{primk}(op, \adone, [\;], \_, \akaddr)$
+  $\leadsto \{\A{\aval'}{\astore}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -1027,16 +1046,16 @@ $\textbf{mt} \leadsto \emptyset$
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% PRIM KONT NOT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{primk}(op, \adone , e_h::e_t , \aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_h , \aenv{\akont} , \astore' , \akaddr'' \rangle\}$
+  $\textbf{primk}(op, \adone , e_h::e_t , \aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_h}{\aenv_{\akont}}{\astore'}{\akaddr'}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \akaddr'' &\triangleq \akalloc{e_h , \aenv_{\akont}} \\
-  \akont' &\triangleq \textbf{primk}(op, \adone \mdoubleplus [\aval] \\
-            &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , \aenv_{\akont} , \akaddr') \\
-  \astore' &\triangleq \astore \sqcup [\akaddr'' \mapsto \akont']
+  \akaddr' &\triangleq \akalloc{e_h , \aenv_{\akont}} \\
+  \akont &\triangleq \textbf{primk}(op, \adone \mdoubleplus [\aval] \\
+            &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , \aenv_{\akont} , \akaddr) \\
+  \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \akont]
 \end{align*}
 \end{multicols*}
 
@@ -1058,8 +1077,8 @@ Rules for when the control is a value
 ]
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appappk}(\ectrl, \aval_f , \_, \_ , \akaddr')$
-  $\leadsto \{E\langle e_b , \aenv_{\lambda}' , \astore' , \akaddr' \rangle\}$
+  $\textbf{appappk}(\ectrl, \aval_f , \_, \_ , \akaddr)$
+  $\leadsto \{\E{e_b}{\aenv_{\lambda}'}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -1073,8 +1092,8 @@ Rules for when the control is a value
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appappk}(\ectrl, \aval_f, \_, \_, \akaddr')$
-  $\leadsto \{E\langle e_b , \aenv_{\lambda}' , \astore' , \akaddr' \rangle\}$
+  $\textbf{appappk}(\ectrl, \aval_f, \_, \_, \akaddr)$
+  $\leadsto \{\E{e_b}{\aenv_{\lambda}'}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
@@ -1082,19 +1101,19 @@ Rules for when the control is a value
   \aval_f &\ni (\vararglamsyn{x}{e_b} , \aenv_{\lambda}) \\
   \abaddr &\triangleq \aballoc{x , \ectrl} \\
   \aenv_{\lambda}' &\triangleq \aenv_{\lambda}[x \mapsto \abaddr] \\
-  \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \aval]
+  \astore' &\triangleq \astore \sqcup [\abaddr \mapsto \aval]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST KONT TODO %%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appappk}(\ectrl, \varnothing , e_x , \aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_x , \aenv_{\akont} , \astore' , \akaddr'' \rangle\}$
+  $\textbf{appappk}(\ectrl, \varnothing , e_x , \aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_x}{\aenv_{\akont}}{\astore'}{\akaddr'}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \akaddr'' &\triangleq \akalloc{e_x , \aenv_{\akont}} \\
-  \akont' &\triangleq \textbf{appappk}(\ectrl,\aval,e_x,\aenv_{\akont},\akaddr') \\
-  \astore' &\triangleq \astore \sqcup [\akaddr'' \mapsto \akont']
+  \akaddr' &\triangleq \akalloc{e_x , \aenv_{\akont}} \\
+  \akont &\triangleq \textbf{appappk}(\ectrl,\aval,e_x,\aenv_{\akont},\akaddr) \\
+  \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \akont]
 \end{align*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1109,14 +1128,14 @@ Rules for when the control is a value
 
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appk}(\ectrl, \aval_h::\aval_t , [\;] , \_ , \akaddr')$
-  $\leadsto \{E\langle e_b , \aenv_{\lambda}' , \astore' , \akaddr' \rangle\}$
+  $\textbf{appk}(\ectrl, \aval_h::\aval_t , [\;] , \_ , \akaddr)$
+  $\leadsto \{\E{e_b}{\aenv_{\lambda}'}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
   \aval_h &\ni (\_ , (\lamsyn{x_s}{e_b} , \aenv_{\lambda})) \\
-  \abaddr_i &\triangleq \aballoc(x_i , \ectrl) \\
+  \abaddr_i &\triangleq \aballoc{x_i , \ectrl}\\
   \aenv_{\lambda}' &\triangleq \aenv_{\lambda}[x_0 \mapsto \abaddr_0 ... \\
           &\;\;\;\;\;\;\;\;\;\,x_{n-1} \mapsto \abaddr_{n-1}] \\
   \aval_t' &\triangleq \aval_t \mdoubleplus [\aval] \\
@@ -1125,14 +1144,14 @@ Rules for when the control is a value
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appk}(\ectrl, \aval_h::\aval_t , [\;] , \_ , \akaddr')$
-  $\leadsto \{E\langle e_b , \aenv_{\lambda}' , \astore' , \akaddr' \rangle\}$
+  $\textbf{appk}(\ectrl, \aval_h::\aval_t , [\;] , \_ , \akaddr)$
+  $\leadsto \{\E{e_b}{\aenv_{\lambda}'}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
   \aval_h &\ni (\_ , (\vararglamsyn{x}{e_b} , \aenv_{\lambda})) \\
-  \abaddr &\triangleq \aballoc(x , \ectrl) \\
+  \abaddr &\triangleq \aballoc{x , \ectrl} \\
   \aenv_{\lambda}' &\triangleq \aenv_{\lambda}[x \mapsto \abaddr] \\
   \aval_t' &\triangleq \aval_t \mdoubleplus [\aval] \\
   \astore' &\triangleq \astore \sqcup [\abaddr \mapsto \aval_t']
@@ -1140,27 +1159,27 @@ Rules for when the control is a value
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION KONTINUATION %%%%%%%%%%%%%%%%%%%%%
 \begin{center}
   $\textbf{appk}(\ectrl , [\aval_f] , [\;] . \aenv_{\akont} , \_)$
-  $\leadsto \{A\langle \aval , \astore' , \akaddr' \rangle\}$
+  $\leadsto \{\A{\aval}{\astore'}{\akaddr}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
   \aval_f &= (\akont_{\lambda} , \_) \\
-  \akaddr' &\triangleq \akalloc{\ectrl , \aenv_{\akont}} \\
-  \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \akont_{\lambda}]
+  \akaddr &\triangleq \akalloc{\ectrl , \aenv_{\akont}} \\
+  \astore' &\triangleq \astore \sqcup [\akaddr \mapsto \akont_{\lambda}]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION NOT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{center}
-  $\textbf{appk}(\ectrl , \adone , e_h::e_t , \aenv_{\akont} , \akaddr')$
-  $\leadsto \{E\langle e_h , \aenv_{\akont} , \astore' , \akaddr'' \rangle\}$
+  $\textbf{appk}(\ectrl , \adone , e_h::e_t , \aenv_{\akont} , \akaddr)$
+  $\leadsto \{\E{e_h}{\aenv_{\akont}}{\astore'}{\akaddr'}\}$
 \end{center}
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \akaddr'' &\triangleq \akalloc{e_h , \aenv_{\akont}} \\
-  \akont' &\triangleq \textbf{appk}(\ectrl, \adone \mdoubleplus [\aval],
-            e_t , \aenv_{\akont} , \akaddr') \\
-  \astore' &\triangleq \astore \sqcup [\akaddr'' \mapsto \akont']
+  \akaddr' &\triangleq \akalloc{e_h , \aenv_{\akont}} \\
+  \akont &\triangleq \textbf{appk}(\ectrl, \adone \mdoubleplus [\aval],
+            e_t , \aenv_{\akont} , \akaddr) \\
+  \astore' &\triangleq \astore \sqcup [\akaddr' \mapsto \akont]
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% ITS OVER %%%%%%%%%%%%%%%%%%%%%%%%%
 \end{multicols*}
