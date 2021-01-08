@@ -1083,7 +1083,7 @@ Rules for when the control is a value
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \aval_f &\ni (\lamsyn{x_s}{e_b} , \aenv_{\lambda}) \\
+  \aval_f &\ni (\_, (\lamsyn{x_s}{e_b} , \aenv_{\lambda})) \\
   \abaddr_i &\triangleq \aballoc{x_i , \ectrl} \\
   \aenv_{\lambda}' &\triangleq \aenv_{\lambda}[x_0 \mapsto \abaddr_0\;... \\
                         &\;\;\;\;\;\;\;\;\;\,x_{n-1} \mapsto \abaddr_{n-1}] \\
@@ -1098,7 +1098,7 @@ Rules for when the control is a value
 \vspace{-7mm}
 \begin{align*}
   \text{where }
-  \aval_f &\ni (\vararglamsyn{x}{e_b} , \aenv_{\lambda}) \\
+  \aval_f &\ni (\_, (\vararglamsyn{x}{e_b} , \aenv_{\lambda})) \\
   \abaddr &\triangleq \aballoc{x , \ectrl} \\
   \aenv_{\lambda}' &\triangleq \aenv_{\lambda}[x \mapsto \abaddr] \\
   \astore' &\triangleq \astore \sqcup [\abaddr \mapsto \aval]
