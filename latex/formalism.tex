@@ -56,557 +56,473 @@
 % textsf for syntactic domains
 % textit for semantic domains
 % \maketitle
-\section{Concrete Semantics of Scheme}
 
-{\footnotesize
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%% CONCRETE SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%% FLAT CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\newcommand{\cExp}[0]{\textsf{Exp}}
+\newcommand{\cVar}[0]{\textsf{Var}}
+\newcommand{\cCall}[0]{\textsf{Call}}
+\newcommand{\cApply}[0]{\textsf{Apply}}
+\newcommand{\cLet}[0]{\textsf{Let}}
+\newcommand{\cLam}[0]{\textsf{Lam}}
+\newcommand{\cState}[0]{\Sigma}
+\newcommand{\cstate}[0]{\varsigma}
+\newcommand{\cStore}[0]{\textit{Store}}
+\newcommand{\cBAddr}[0]{\textit{BAddr}}
+\newcommand{\cKAddr}[0]{\textit{KAddr}}
+\newcommand{\cVal}[0]{\textit{Val}}
+\newcommand{\cKont}[0]{\textit{Kont}}
+\newcommand{\ckont}[0]{\kappa}
+\newcommand{\cEnv}[0]{\textit{Env}}
+\newcommand{\cenv}[0]{\rho}
+\newcommand{\cstore}[0]{\sigma}
+\newcommand{\ckaddr}[0]{a_{\kappa}}
+\newcommand{\cClo}[0]{\textit{Clo}}
+\newcommand{\cinj}[0]{inj}
+\newcommand{\cnewenv}[0]{new\rho}
+\newcommand{\cPrim}[0]{\textsf{Prim}}
+\newcommand{\ccalllist}[0]{\overrightarrow{call}}
+
 \begin{multicols*}{2}
-\begin{center}
-\textbf{Syntax Domains:}
-\end{center}
-\vspace{-16mm}
-\begin{center}
-\begin{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% EXPRESSIONS %%%%%%%%%%%%%%%%%%%%%%%%%
-  e \in \textsf{Exp} &::= \mae \\
-                     &|\; \ifsyn{e}{e}{e} \\
-                     &|\; \letsyn{x}{e}{e} \\
-                     &|\; \callccsyn{e} \\
-                     &|\; \setsyn{x}{e} \\
-                     &|\; \primsyn{op}{e} \\
-                     &|\; \applyprimsyn{op}{e} \\
-                     &|\; \applysyn{e}{e} \\
-                     &|\; (e\;e\;...) \\
-%%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EXPRESSIONS %%%%%%%%%%%%%%%%%%%%%%%%%
-  \mae \in \textsf{AExp} &::= x\;|\; lam\;|\; \mathbb{Z}
-                           \;|\; \truesyn \;|\; \falsesyn \\
-                   &\;\;\;\;\;\;\;\;\;\, |\; \quotesyn{e} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% LAMBDA EXPRESSIONS %%%%%%%%%%%%%%%%%%%%%%%%%
-  lam \in \textsf{Lam} &::= \lamsyn{x}{e} \;|\; \vararglamsyn{x}{e} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% VARIABLE SET %%%%%%%%%%%%%%%%%%%%%%%%%
-  x \in \textsf{Var} &\;\;\;\;\;\; \text{A set of identifiers} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% PRIMITIVE SET %%%%%%%%%%%%%%%%%%%%%%%%%
-  op \in \textsf{Prim} &\;\;\;\;\;\; \text{A set of primitives} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% END SYNTAX DOMAINS %%%%%%%%%%%%%%%%%%%%%%%%%
-\end{align*}
-\end{center}
-%%%%%%%%%%%%%%%%%%%%% OTHER THINGS COLUMN 1! %%%%%%%%%%%%%%%%%%
-\vspace{-7mm}
-%%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  \textbf{Atomic Evaluation:} \\
-  $\mathcal{A} : \Sigma_E \rightharpoonup \textit{Val}$
-\vspace{-7mm}
-\end{center}
-\begin{align*}
-  \mathcal{A}(\langle lam , \rho , ... \rangle)  &\triangleq (lam , \rho) \\
-  \mathcal{A}(\langle \quotesyn{e} , ... \rangle) &\triangleq \textbf{quote}(e) \\
-  \mathcal{A}(\langle x, \rho , \sigma , ... \rangle) &\triangleq \sigma(\rho(x)) \\
-  \mathcal{A}(\langle \mae , ... \rangle) &\triangleq \mae
-\end{align*}
-\vspace{-9mm}
-%%%%%%%%%%%%%%%%%%%%%%%%% INJECTION %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-\textbf{Injection:} \\
-$\mathcal{I} : \textsf{Exp} \rightarrow \Sigma_E$ \\
-$\mathcal{I}(e) \triangleq E\langle e , \varnothing , \varnothing , \{(0, 0) : \textbf{mt}\} , (0, 0) \rangle$
-\end{center}
-\vspace{-8mm}
-%%%%%%%%%%%%%%%%%%%%%%%%% STORE JOIN SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  \textbf{Store Joining:} \\
-  $\store \sqcup [a \mapsto v] \triangleq \store[a \mapsto v]$ \\
-\end{center}
-%%%%%%%%%%%%%%%%%%%%%%%%% COLLECTING SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  \textbf{Collecting Semantics:} \\
-  $eval(e) = \{\varsigma \;|\; \mathcal{I}(e) \mapsto\hspace{-1.5mm}^*\; \varsigma \}$
-\end{center}
-\vspace{-10mm}
-
-
-%%%%% COLUMN BREAK %%%%%%
-\vfill\null
-\columnbreak
-%%%%% COLUMN BREAK %%%%%%
-
-
-\begin{center}
-\textbf{Semantic Domains:}
-\end{center}
-\vspace{-8mm}
-\begin{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%
-  \varsigma \in \Sigma &\triangleq E\langle\textit{Eval}\rangle
-                         + A\langle\textit{Apply}\rangle \\
-  \textit{Eval} &\triangleq \textsf{Exp} \times \textit{Env}
-                  \times \textit{Store} \times \textit{Addr} \\
-  \textit{Apply} &\triangleq \textit{Val} \times \textit{Store}
-                   \times \textit{Addr} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% ENVIRONMENT %%%%%%%%%%%%%%%%%%%%%%%%%
-  \rho \in \textit{Env} &\triangleq \textsf{Var} \rightharpoonup
-	  											\textit{Addr} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% STORE %%%%%%%%%%%%%%%%%%%%%%%%%
-  \sigma \in \textit{Store} &\triangleq \textit{BAddr} \rightharpoonup
-                              \textit{Val} \\
-  & \times \textit{KAddr} \rightharpoonup \textit{Kont} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% VALUES %%%%%%%%%%%%%%%%%%%%%%%%%
-  v \in \textit{Val} &\triangleq \textit{Clo} + \textit{Kont} + \mathbb{Z} \\
-                     &+ \{ \truesyn,\falsesyn, \textit{Null} , \textit{Void} \} \\
-                     &+ \{\textbf{quote}(e) , \textbf{cons}(v, v)\} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%
-  clo \in \textit{Clo} &\triangleq \textsf{Lam} \times \textit{Env} \\
-  %%%%%%%%%%%%%%%%%%%%%%%%% ADDRESSES %%%%%%%%%%%%%%%%%%%%%%%%%
-  a \in \textit{BAddr} &\triangleq \mathbb{N} \times \mathbb{N} \\
-  a_\kappa \in \textit{KAddr} &\triangleq \mathbb{N} \\
-%%%%%%%%%%%%%%%%%%%%%%%%% KONTINUATIONS %%%%%%%%%%%%%%%%%%%%%%%%%
-  \kappa \in \textit{Kont} &::= \textbf{mt} \\
-                     &|\; \textbf{ifk}(e, e, \env, \kaddr) \\
-                     &|\; \textbf{letk}(vars, done, todo, e, \env , \kaddr) \\
-                     &|\; \textbf{callcck}(\kaddr) \\
-                     &|\; \textbf{setk}(x, \env, \kaddr) \\
-                     &|\; \textbf{primk}(op, done, todo, \env, \kaddr) \\
-                     &|\; \textbf{appprimk}(op, \kaddr) \\
-                     &|\; \textbf{appk}(done, todo, \env , \kaddr) \\
-                     &|\; \textbf{appappk}(val?, e, \env , \kaddr) \\
-%%%%%%%%%%%%%%%%%%%%%%%%% OTHER VARIABLES %%%%%%%%%%%%%%%%%%%%%%%%%
-%%% done/todo variables
-  done &\triangleq \textit{Val}^\ast \\
-  todo &\triangleq \textsf{Exp}^* \\
-  vars &\triangleq \textsf{Var}^*
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% ALLOC FUNCTION %%%%%%%%%%%%%%%%
-\begin{center}
-  \textbf{Address Allocation:} \\
-  $\;\;\;\;\;\;\;balloc : \Sigma \times \mathbb{N} \rightarrow \textit{BAddr}$ \\
-  $kalloc : \Sigma \rightarrow \textit{KAddr}$
-\end{center}
-\vspace{-6mm}
-\begin{align*}
-  balloc(\langle \sigma , ... \rangle, n) &\triangleq (|\sigma| , n) \\
-  kalloc(\langle \sigma , ... \rangle) &\triangleq (|\sigma|)
-\end{align*}
+  [
+  \begin{center}
+    \textbf{Concrete Scheme CESK* With Flat Closures} \\
+  \end{center}
+  ]
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%% DOMAINS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \noindent
+  \textbf{Syntactic Domains}
+  \begin{align*}
+    e \in \cExp &::= \mae \\
+                & |\; \ifsyn{e}{e}{e} \;|\; \setsyn{x}{e} \\
+                &|\; \callccsyn{e} \\
+                &|\; apply \;|\; let \;|\; call \\
+    \mae \in \textsf{AExp} &::= x \;|\; lam \;|\; op \\
+                &|\; \quotesyn{e} \;|\; b \;|\; n \\
+    n \in \mathbb{Z} &\\
+    b \in \mathbb{B} &\triangleq \{\truesyn , \falsesyn\} \\
+    x \in \cVar &\triangleq \text{The set of identifiers} \\
+    op \in \cPrim &\triangleq \text{The set of prims} \\
+    apply \in \cApply &::= \applysyn{e}{e} \\
+    call \in \cCall &::= (e \; e \; ...) \\
+    let \in \cLet &::= \letsyn{x}{e}{e} \\
+    lam \in \cLam &::= (\lambda \; (x) \; e) \;|\; (\lambda \; x \; e)
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  \vfill\null
+  \columnbreak
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  \noindent
+  \textbf{Semantic Domains}
+  \begin{align*}
+    \cstate \in \cState &\triangleq E\langle \textit{Eval} \rangle
+                          + A\langle \textit{Apply} \rangle \\
+    \textit{Eval} &\triangleq \cExp \times \cEnv \times \cStore \times \cKAddr \\
+    \textit{Apply} &\triangleq \cVal \times \cEnv \times \cStore \times \cKAddr \\
+    \cenv \in \cEnv &\triangleq \mathbb{N} \times \cExp^* \\
+    \cstore \in \cStore &\triangleq \cBAddr
+                                 \rightharpoonup \cVal \\
+    & \times \cKAddr \rightharpoonup \cKont \\
+    a \in \cBAddr &\triangleq \cVar \times \cEnv \\
+    \ckaddr \in \cKAddr &\triangleq \mathbb{N} \\
+    v \in \cVal &\triangleq \cClo + \mathbb{Z} + \mathbb{B} \\
+                        & + \cPrim + \cKont \\
+                        & + \{\textbf{quote}(e) , \textbf{cons}(v , v) ,
+                          \textit{Void}\} \\
+    clo \in \cClo &\triangleq \cLam \times \cEnv \\
+    \ckont \in \cKont &::= \textbf{mt} \\
+                        &|\; \textbf{ifk}(e , e , \cenv , \ckaddr) \\
+                        &|\; \textbf{setk}(a, \ckaddr) \\
+                        &|\; \textbf{callcck}(\callccsyn{e} , \ckaddr) \\
+                        &|\; \textbf{applyk}(apply, v? , e , \cenv , \ckaddr) \\
+                        &|\; \textbf{callk}(call,done,todo,\cenv,\ckaddr) \\
+    done &\in \cVal^* \\
+    todo &\in \cExp* \\
+  \end{align*}
 \end{multicols*}
-}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%% BEGIN EVAL SEMANTICS %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%% CONCRETE FLAT SEMANTICS %%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%  MORE FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpage
 
-\footnotesize{
 \begin{multicols*}{2}
-[
-\begin{center}
-\textbf{Eval Rules} \\
-Rules for when the control is an expression \\
-\vspace{2mm}
-$\state = \E{\ctrl}{\env}{\store}{\kaddr}$
-Proceed by matching on $\ctrl$ \\
-%%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EVALUATION %%%%%%%%%%%%%%%%
-\vspace{3mm}
-$\mae \leadsto \A{v}{\store}{\kaddr}{}$
-\end{center}
-]
-%%%%%%%%%%%%%%%%%%%%%%%%% IF EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\ifsyn{e_c}{e_t}{e_f}$
-  $\leadsto \E{e_c}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{ifk}(e_t , e_f , \env , \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION NO ARGSVALS %%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $(\texttt{let}\;()\;e_b)$
-  $\leadsto \E{e_b}{\env}{\store}{\kaddr}$
-\end{center}
-\vspace{-5mm}
-%%%%%%%%%%%%%%%%%%%%%%%%% LET EXPRESSION VALS GOT ARGS %%%%%%%%%%%%%%%
-\begin{center}
-  $(\texttt{let}\;binds\;e_b)$
-  $\leadsto \E{e_0}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  binds &= ([x_0\;e_0]\;[x_s\;e_s]\;...) \\
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{letk}(x_0::x_s , [\;] , e_s , e_b , \env , \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\callccsyn{e}$
-  $\leadsto \E{e}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-5mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{callcck}(\kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr \mapsto \kont]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% SET EXPRESSION %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\setsyn{x}{e}$
-  $\leadsto \E{e}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-5mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \baddr &\triangleq \env(x) \\
-  \kont &\triangleq \textbf{setk}(\baddr , \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\vfill\null
-\columnbreak
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%% PRIM NO ARG EXPRESSION %%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\singleprimsyn{op}$
-  $\leadsto \A{v}{\store}{\kaddr}{}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } v &= op \text{ applied to } 0 \text{ arguments}
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% PRIM WITH ARGS EXPRESSION %%%%%%%%%%%%%%%%
-\begin{center}
-  $\primsyn{op}{e_0\;e_s}$
-  $\leadsto \E{e_0}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{primk}(op , [\;], e_s , \env , \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM EXPRESSION %%%%%%%%%%%%%%%%
-\begin{center}
-  $\applyprimsyn{op}{e}$
-  $\leadsto \E{e}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{appprimk}(op, \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLY FUNCTION LIST EXPRESSION %%%%%%%%%%%%%%%%
-\begin{center}
-  $\applysyn{e_f}{e_x}$
-  $\leadsto \E{e_f}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{appappk}(\varnothing, e_x, \env, \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION EXPRESSION %%%%%%%%%%%%%%%%
-\begin{center}
-  $(e_f\;e_s\;...)$
-  $\leadsto \E{e_f}{\env}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-5mm}
-\begin{align*}
-  \text{where }
-  \kaddr' &\triangleq kalloc(\state) \\
-  \kont &\triangleq \textbf{appk}([\;] , e_s , \env , \kaddr) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont]
-\end{align*}
+  [
+  \begin{center}
+    \textbf{Useful Functions}
+  \end{center}
+  ]
+  \noindent
+  \textbf{Callable helper function}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CALLFUNC  DEFINITION %%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $ CALL : \cVal \times \cVal^* \times \cEnv$
+    $\times \; \cStore \times \cExp \times \cKAddr \rightarrow \cState $ \\
+  \end{center}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CALLFUNC MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $CALL(clo , \overrightarrow{v} , \cenv , \cstore , e, \ckaddr)
+            \triangleq \E{e_b}{\cenv'}{\cstore'}{\ckaddr}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    clo &= ((\lambda \; (x \; ...) \; e_b) , \cenv_{\lambda}) \\
+    \cenv' &\triangleq \cnewenv(e , \cenv) \\
+    a_{x_i} &\triangleq (x_i , \cenv') \\
+    x_j' &\triangleq free((\lambda \; (x \; ...) \; e_b)) \\
+    a_{x_j'} &\triangleq (x_j' , \cenv') \\
+    \cstore' &\triangleq \cstore
+               \sqcup [a_{x_i} \mapsto \overrightarrow{v_i}]
+               \sqcup [a_{x_j'} \mapsto \cstore(x_j' , \cenv_{\lambda})]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%% CALLFUNC VARARG %%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $CALL(clo , \overrightarrow{v} , \cenv , \cstore , e , \ckaddr)
+             \triangleq \E{e_b}{\cenv'}{\cstore'}{\ckaddr}$ \\
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    clo &= ((\lambda \; x \; e_b) , \cenv_{\lambda}) \\
+    \cenv' &\triangleq \cnewenv(e , \cenv) \\
+    a_x &\triangleq (x , \cenv') \\
+    x_j' &\triangleq free((\lambda \; x \; e_b)) \\
+    a_{x_j'} &\triangleq (x_j' , \cenv') \\
+    \cstore' &\triangleq \cstore
+               \sqcup [a_x \mapsto \overrightarrow{v}]
+               \sqcup [a_{x_j'} \mapsto \cstore(x_j' , \cenv_{\lambda})]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%% CALLFUNC KONT %%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $CALL(\kappa , [v] , \cenv , \cstore , e , \_)
+           \triangleq \A{v}{\cenv}{\cstore'}{\ckaddr} $
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \ckaddr &\triangleq |\cstore| \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr \mapsto \kappa]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%% CALLFUNC PRIM %%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $CALL(op , \overrightarrow{v} , \cenv , \cstore , \_ , \ckaddr)
+    \triangleq \A{v}{\cenv}{\cstore}{\ckaddr}$ \\
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    v &\triangleq op \text{ applied to } \overrightarrow{v}
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  \vfill\null
+  \columnbreak
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  \noindent \textbf{Injection} \\
+  \vspace{-7mm}
+  \begin{center}
+    $\cinj : \cExp \rightarrow \cState$ \\
+    $\cinj(e) \triangleq
+    (e , (0 , \epsilon) , \{0 : \textbf{mt} \} , 0)$
+  \end{center}
+  \textbf{Allocation} \\
+  \vspace{-3mm}
+  \begin{align*}
+    \cnewenv : \cExp &\times \cEnv \rightarrow \cEnv \\
+    \cnewenv(e , (n,\overrightarrow{e})) &\triangleq (n+1, e::\overrightarrow{e})
+  \end{align*}
+  \textbf{Atomic Evaluation} \\
+  \vspace{-3mm}
+  \begin{align*}
+    \mathcal{A} : \textit{Eval} &\rightarrow \cVal \\
+    \mathcal{A}(\E{n}{\_}{\_}{\_}) &\triangleq n \\
+    \mathcal{A}(\E{b}{\_}{\_}{\_}) &\triangleq b \\
+    \mathcal{A}(\E{\quotesyn{e}}{\_}{\_}{\_}) &\triangleq \textbf{quote}(e) \\
+    \mathcal{A}(\E{op}{\cenv}{\cstore}{\_})
+                                &\triangleq op \text{ when }
+                                  (op , \cenv) \not\in \cstore \\
+    \mathcal{A}(\E{lam}{\cenv}{\_}{\_}) &\triangleq (lam , \cenv) \\
+    \mathcal{A}(\E{x}{\cenv}{\cstore}{\_}) &\triangleq \cstore(x , \cenv)
+  \end{align*}
+  \textbf{Store Joining} \\
+  \vspace{-3mm}
+  \begin{align*}
+    \sigma \sqcup [a \mapsto v] &\triangleq \sigma[a \mapsto v]
+  \end{align*}
 \end{multicols*}
-} % footnotesize
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%% BEGIN APPLY SEMANTICS %%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%% CONCRETE FLAT SEMANTICS %%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 1 (EVAL) %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpage
 
-\newcommand{\kenv}[0]{\env_{\kappa}}
-\newcommand{\lamenv}[0]{\env_{\lambda}}
-
 \begin{multicols*}{2}
-[
-\begin{center}
-\textbf{Apply Rules} \\
-Rules for when the control is a value \\
-$\state = \A{v}{\store}{\kaddr}{}$ \\
-$\kont \triangleq \store(\kaddr)$ \\
-Proceed by matching on $\kont$ \\
-%%%%%%%%%%%%%%%%%%%%%%%%% EMPTY KONT %%%%%%%%%%%%%%%%%%%%%%%%%
-\vspace{5mm}
-$\textbf{mt} \leadsto \state$
-\end{center}
-\vspace{-5mm}
-]
-%%%%%%%%%%%%%%%%%%%%%%%%% IF KONT FALSE %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{ifk}(\_ , e_f , \kenv , \kaddr')$
-  $\leadsto \E{e_f}{\kenv}{\store}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } v &= \falsesyn
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% IF KONT TRUE %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{ifk}(e_t , \_ , \kenv, \kaddr')$
-  $\leadsto \E{e_t}{\kenv}{\store}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } v &\not= \falsesyn
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% LET KONT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{letk}(vars , done , [\;] , e_b , \kenv , \kaddr')$
-  $\leadsto \E{e_b}{\kenv'}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \baddr_i &\triangleq balloc(\state , i) \\
-  done' &\triangleq done \mdoubleplus [v] \\
-  \kenv' &\triangleq \kenv[vars_0 \mapsto a_0\;...\\
-           &\;\;\;\;\;\;\;\;\;\; vars_{n-1} \mapsto a_{n-1}] \\
-  \store' &\triangleq \sigma \sqcup [a_0 \mapsto done'_0\;...\\
-           &\;\;\;\;\;\;\;\;\;\;\;\; a_{n-1} \mapsto done'_{n-1}]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% LET KONT MORE TODO %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{letk}(vars, done, e_h::e_t , e_b , \kenv , \kaddr')$
-  $\leadsto \E{e_h}{\kenv}{\store'}{\kaddr''}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr'' &\triangleq kalloc(\state) \\
-  \kont' &\triangleq \textbf{letk}(vars, done \mdoubleplus [v], \\
-           &\;\;\;\;\;\;\;\;\;\;\;\;\;e_t , e_b , \kenv , \kaddr') \\
-  \store' &\triangleq \store \sqcup [\kaddr'' \mapsto \kont']
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% SET! KONT %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{setk}(\baddr, \kaddr')$
-  $\leadsto \A{\textit{Void}}{\store'}{\kaddr'}{}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where } \store' &\triangleq \store \sqcup [a \mapsto v]
-\end{align*}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\vfill\null
-\columnbreak
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC MULTIARG KONT %%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{callcck}(\kaddr')$
-  $\leadsto \E{e}{\lamenv'}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  v &= (\singlelamsyn{x}{e} , \lamenv) \\
-  \baddr &\triangleq balloc(\state, 0) \\
-  \kont' &\triangleq \store(\kaddr') \\
-  \lamenv' &\triangleq \lamenv[x \mapsto \baddr] \\
-  \store' &\triangleq \store \sqcup [\baddr \mapsto \kont']
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC KONT ARG %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{callcck}(\_)$
-  $\leadsto \A{\kont}{\store'}{\kaddr'}{}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  v &= \kont' \\
-  \kaddr' &\triangleq kalloc(\state) \\
-  \store' &\triangleq \store \sqcup [\kaddr' \mapsto \kont']
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLY PRIM KONT %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appprimk}(op, \kaddr')$
-  $\leadsto \A{v'}{\store}{\kaddr'}{}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } v' &\triangleq op \text{ applied to } v
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% PRIM KONT DONE %%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{primk}(op , done , [\;] , \_ , \kaddr')$
-  $\leadsto \A{v'}{\store}{\kaddr'}{}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-\text{where } v' &\triangleq op \text{ applied to } (done \mdoubleplus [v])
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% PRIM KONT NOT DONE %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{primk}(op, done, e_h::e_t, \kenv, \kaddr')$
-  $\leadsto \E{e_h}{\kenv}{\store'}{\kaddr''}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr'' &\triangleq kalloc(\state) \\
-  \kont' &\triangleq \textbf{primk}(op, done \mdoubleplus [v],\\
-           &\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\;\; e_t , \kenv , \kaddr') \\
-  \store' &\triangleq \store \sqcup [\kaddr'' \mapsto \kont']
-\end{align*}
+  [
+  \begin{center}
+    \textbf{Eval Semantics}
+  \end{center}
+  ]
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ATOMIC EXP %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{\mae}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \A{v}{\cenv}{\cstore}{\ckaddr}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where } v &\triangleq \mathcal{A}(\varsigma)
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% IF CONDITIONAL %%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{\ifsyn{e_c}{e_t}{e_f}}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e_c}{\cenv}{\cstore'}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \ckaddr' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{ifk}(e_t , e_f , \cenv , \ckaddr) \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%% LET BECOMES CALL %%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{let}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{call}{\cenv}{\cstore}{\ckaddr}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    let &= (\texttt{let} \; ([x_s \; e_s] \; ...) \; e_b) \\
+    call &= ((\lambda \; (x_s \; ...) \; e_b) \; e_s)
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SET MUTATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{\setsyn{x}{e}}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e}{\cenv}{\cstore'}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    a &\triangleq (x , \cenv) \\
+    \ckaddr' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{setk}(a , \ckaddr) \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CALL/CC BECOMES CALL %%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{\callccsyn{e}}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e}{\cenv}{\cstore'}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \ckaddr' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{callcck}(\callccsyn{e} , \ckaddr) \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  \vfill\null
+  \columnbreak
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% APPLY %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{\applysyn{e_f}{e}}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e_f}{\cenv}{\cstore'}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \ckaddr' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{applyk}(\applysyn{e_f}{e} , \varnothing ,
+             e , \cenv , \ckaddr) \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% UNTAGGED CALL %%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\E{(e_f \; e_s \; ...)}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e_f}{\cenv}{\cstore'}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \ckaddr' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{callk}((e_f \; e_s \; ...) , \epsilon
+             , e_s , \cenv , \ckaddr) \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% NAME %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+  \end{align*}
 \end{multicols*}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%% CONCRETE FLAT SEMANTICS %%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 2 (APPLY 1) %%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newpage
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%% MORE APPLY SEMANTICS %%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \begin{multicols*}{2}
-[
-\begin{center}
-\textbf{More Apply Rules} \\
-Rules for when the control is a value
-\end{center}
-]
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appappk}(v_f , \_ , \_ , \kaddr')$
-  $\leadsto \E{e_b}{\lamenv'}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  v_f &= (\lamsyn{x_s}{e_b} , \lamenv) \\
-  a_i &\triangleq balloc(\state, i) \\
-  \lamenv' &\triangleq \lamenv[x_0 \mapsto a_0\;...\\
-      &\;\;\;\;\;\;\;\;\;\,x_{n-1} \mapsto a_{n-1}] \\
-  \store' &\triangleq \store \sqcup [a_0 \mapsto v_0\;...\\
-  &\;\;\;\;\;\;\;\;\;\;\;\;a_{n-1} \mapsto v_{n-1}]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST DONE VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appappk}(v_f, \_, \_, \kaddr')$
-  $\leadsto \E{e_b}{\lamenv'}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  v_f &= (\vararglamsyn{x}{e_b}, \lamenv) \\
-  a &\triangleq balloc(\state, 0) \\
-  \lamenv' &\triangleq \lamenv[x \mapsto a] \\
-  \store' &\triangleq \store \sqcup [a \mapsto v]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLY LIST KONT TODO %%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appappk}(\varnothing, e, \kenv, \kaddr')$
-  $\leadsto \E{e}{\kenv}{\store'}{\kaddr''}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr'' &\triangleq kalloc(\state) \\
-  \kont' &\triangleq \textbf{appappk}(v, e, \kenv , \kaddr') \\
-  \store' &\triangleq \store \sqcup [\kaddr'' \mapsto \kont']
-\end{align*}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\vfill\null
-\columnbreak
-%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% COLUMN BREAK %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appk}(done, [\;] , \_ , \kaddr')$
-  $\leadsto \E{e_b}{\lamenv'}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  done &= (\lamsyn{x_s}{e_b} , \lamenv) :: v_s \\
-  a_i &\triangleq balloc(\state, i) \\
-  v'_s &\triangleq v_s \mdoubleplus [v] \\
-  \lamenv' &\triangleq \lamenv[x_0 \mapsto a_0\;...\\
-       &\;\;\;\;\;\;\;\;\;\;x_{n-1} \mapsto a_{n-1}] \\
-  \store' &\triangleq \store \sqcup [a_0 \mapsto v'_0\;...\\
-  &\;\;\;\;\;\;\;\;\;\;\;\; a_{n-1} \mapsto v'_{n-1}]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION VARARG %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appk}(done, [\;], \_, \kaddr')$
-  $\leadsto \E{e_b}{\lamenv'}{\store'}{\kaddr'}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  done &= (\vararglamsyn{x}{e_b} , \lamenv) :: v_s \\
-  a &\triangleq balloc(\state, 0) \\
-  v'_s &\triangleq v_s \mdoubleplus [v] \\
-  \lamenv' &\triangleq \lamenv[x \mapsto a] \\
-  \store' &\triangleq \store \sqcup [a \mapsto v'_s]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION KONTINUATION %%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appk}([\kont_\lambda] , [\;] , \kenv , \kaddr')$
-  $\leadsto \A{v}{\store'}{\kaddr''}{}$
-\end{center}
-\vspace{-6mm}
-\begin{align*}
-  \text{where }
-  \kaddr'' &\triangleq kalloc(\state) \\
-  \store' &\triangleq \store \sqcup [\kaddr'' \mapsto \kont_\lambda]
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% APPLICATION TODO %%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{center}
-  $\textbf{appk}(done , e_h::e_t , \kenv , \kaddr')$
-  $\leadsto \E{e_h}{\kenv}{\store'}{\kaddr''}$
-\end{center}
-\vspace{-7mm}
-\begin{align*}
-  \text{where }
-  \kaddr'' &\triangleq kalloc(\state) \\
-  \kont' &\triangleq \textbf{appk}(done \mdoubleplus [v] , e_t , \kenv , \kaddr') \\
-  \store' &\triangleq \store \sqcup [\kaddr'' \mapsto \kont']
-\end{align*}
-%%%%%%%%%%%%%%%%%%%%%%%%% ITS OVER %%%%%%%%%%%%%%%%%%%%%%%%%
+  [
+  \begin{center}
+    \textbf{Apply Semantics} \\
+  \end{center}
+  ]
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%% DONE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $ A\langle \cstate \rangle \leadsto A\langle \cstate \rangle $
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \cstore(\ckaddr) &= \textbf{mt}
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%% IF TRUE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e_t}{\cenv_\ckont}{\cstore}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \cstore(\ckaddr) &= \textbf{ifk}(e_t , \_ , \cenv_{\ckont} , \ckaddr') \\
+    v &\not= \falsesyn
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%% IF FALSE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e_f}{\cenv_\ckont}{\cstore}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \cstore(\ckaddr) &= \textbf{ifk}(\_ , e_f , \cenv_{\ckont} , \ckaddr') \\
+    v &= \falsesyn
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SET MUTATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \A{\textit{Void}}{\cenv}{\cstore'}{\ckaddr'}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \cstore(\ckaddr) &= \textbf{setk}(a , \ckaddr') \\
+    \cstore' &\triangleq \cstore \sqcup [a \mapsto v]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CALLCC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \cstate'$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    &\text{where} \\
+    \cstore(\ckaddr) &= \textbf{callcck}(e , \ckaddr') \\
+    \cstate' &\triangleq CALL(v , [\cstore(\ckaddr')] ,
+               \cenv , \cstore , e , \ckaddr') \\
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  \vfill\null
+  \columnbreak
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%% COLUMN BREAK %%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% APPLY TODO %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e}{\cenv_{\ckont}}{\cstore'}{\ckaddr''}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \cstore(\ckaddr) &= \textbf{applyk}(apply , \varnothing , e ,
+                       \cenv_{\ckont} , \ckaddr') \\
+    \ckaddr'' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{applyk}(apply , v , e , \cenv_{\ckont} , \ckaddr') \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr'' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% APPLY DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \cstate'$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    \text{where }
+    \cstore(\ckaddr) &= \textbf{applyk}(apply , v_f , \_ ,
+                       \_ , \ckaddr') \\
+    \cstate' &\triangleq CALL(v_f , v , \cenv , \cstore , apply , \ckaddr')
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%%% CALLK TODO %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \E{e_h}{\cenv_{\kappa}}{\cstore'}{\ckaddr''}$
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    &\text{where} \\
+    \cstore(\ckaddr) &= \textbf{callk}(call, done , e_h::e_t ,
+                       \cenv_{\ckont} , \ckaddr') \\
+    \ckaddr'' &\triangleq |\cstore| \\
+    \ckont &\triangleq \textbf{callk}(call, done \mdoubleplus [v] ,
+             e_t , \cenv_{\ckont} , \ckaddr') \\
+    \cstore' &\triangleq \cstore \sqcup [\ckaddr'' \mapsto \ckont]
+  \end{align*}
+  %%%%%%%%%%%%%%%%%%%%%%%%% CALLK DONE MULTIARG %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  \begin{center}
+    $\A{v}{\cenv}{\cstore}{\ckaddr}$
+    $\leadsto \cstate' $
+  \end{center}
+  \vspace{-7mm}
+  \begin{align*}
+    &\text{where} \\
+    \cstore(\ckaddr) &= \textbf{callk}(call, done ,
+                       \epsilon , \_ , \ckaddr') \\
+    done \mdoubleplus [v] &= v_h :: \overrightarrow{v} \\
+    \cstate' &\triangleq CALL(v_h , \overrightarrow{v} \mdoubleplus [v] ,
+               \cenv , \cstore , call , \ckaddr') \\
+  \end{align*}
 \end{multicols*}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1195,200 +1111,4 @@ Rules for when the control is a value
 \end{align*}
 %%%%%%%%%%%%%%%%%%%%%%%%% ITS OVER %%%%%%%%%%%%%%%%%%%%%%%%%
 \end{multicols*}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%% CONCRETE SEMANTICS %%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%% FLAT CLOSURES %%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\newpage
-\newcommand{\cExp}[0]{\textsf{Exp}}
-\newcommand{\cVar}[0]{\textsf{Var}}
-\newcommand{\cCall}[0]{\textsf{Call}}
-\newcommand{\cLam}[0]{\textsf{Lam}}
-\newcommand{\cState}[0]{\Sigma}
-\newcommand{\cstate}[0]{\varsigma}
-\newcommand{\cStore}[0]{\textit{Store}}
-\newcommand{\cBAddr}[0]{\textit{BAddr}}
-\newcommand{\cKAddr}[0]{\textit{KAddr}}
-\newcommand{\cVal}[0]{\textit{Val}}
-\newcommand{\cKont}[0]{\textit{Kont}}
-\newcommand{\ckont}[0]{\kappa}
-\newcommand{\cEnv}[0]{\textit{Env}}
-\newcommand{\cenv}[0]{\rho}
-\newcommand{\cstore}[0]{\sigma}
-\newcommand{\ckaddr}[0]{a_{\kappa}}
-\newcommand{\cClo}[0]{\textit{Clo}}
-\newcommand{\cinj}[0]{inj}
-\newcommand{\cnewenv}[0]{new\rho}
-\newcommand{\ccalllist}[0]{\overrightarrow{call}}
-
-\begin{multicols*}{2}
-  [
-  \begin{center}
-    \textbf{Concrete CESK* With Flat Closures} \\
-  \end{center}
-  ]
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%% DOMAINS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \noindent
-  \textbf{Syntactic Domains}
-  \begin{align*}
-    e \in \cExp &::= \mae \;|\; call \\
-    \mae \in \textsf{AExp} &::= x \;|\; lam \\
-    x \in \cVar &\triangleq \text{The set of identifiers} \\
-    call \in \cCall &::= (e \; e \; ...) \\
-    lam \in \cLam &::= (\lambda \; (x) \; e) \\
-  \end{align*}
-  \textbf{Injection} \\
-  \vspace{-7mm}
-  \begin{center}
-    $\cinj : \cExp \rightarrow \cState$ \\
-    $\cinj(e) \triangleq
-    (e , (0 , \epsilon) , \{\ckont_0 : \textbf{mt} \} , \ckont_0)$
-  \end{center}
-  \textbf{Allocation} \\
-  \vspace{-3mm}
-  \begin{align*}
-    \cnewenv : \cCall &\times \cEnv \rightarrow \cEnv \\
-    \cnewenv(call , (n , \ccalllist)) &\triangleq (n+1 , call : \ccalllist)
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  %%%%% COLUMN BREAK %%%%%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  \vfill\null
-  \columnbreak
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  %%%%% COLUMN BREAK %%%%%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  \noindent
-  \textbf{Semantic Domains}
-  \begin{align*}
-    \cstate \in \cState &\triangleq E\langle \textit{Eval} \rangle
-                          + A\langle \textit{Apply} \rangle \\
-    \textit{Eval} &\triangleq \cExp \times \cEnv \times \cStore \times \cKAddr \\
-    \textit{Apply} &\triangleq \cVal \times \cEnv \times \cStore \times \cKAddr \\
-    \cenv \in \cEnv &\triangleq \mathbb{N} \times \cCall^* \\
-    \cstore \in \cStore &\triangleq \cBAddr
-                                 \rightharpoonup \cVal \\
-    & \times \cKAddr \rightharpoonup \cKont \\
-    a \in \cBAddr &\triangleq \cVar \times \cEnv \\
-    \ckaddr \in \cKAddr &\triangleq \cExp \times \cEnv \\
-    v \in \cVal &\triangleq \cClo \\
-    clo \in \cClo &\triangleq \cLam \times \cEnv \\
-    \ckont \in \cKont &::= \textbf{mt} \\
-                         &| \; \textbf{callk}(call,done,todo,\cenv,\ckaddr) \\
-    done &\in \cVal^* \\
-    todo &\in \cExp* \\
-  \end{align*}
-\end{multicols*}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%% CONCRETE FLAT SEMANTICS %%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PAGE 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\newpage
-
-\begin{multicols*}{2}
-  [
-  \begin{center}
-    \textbf{Semantics} \\
-  \end{center}
-  ]
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-    $\E{\mae}{\cenv}{\cstore}{\ckaddr}$
-    $\leadsto \A{v}{\cenv}{\cstore}{\ckaddr}$
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-    \text{where } v &\triangleq \mathcal{A}(\varsigma)
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-    $\E{call}{\cenv}{\cstore}{\ckaddr}$
-    $\leadsto \E{e_f}{\cenv}{\cstore'}{\ckaddr'}$
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-    \text{where }
-    call &= (e_f \; e_s \; ...) \\
-    \ckaddr' &\triangleq (e_f , \cenv) \\
-    \ckont &\triangleq \textbf{callk}(call , \epsilon , e_s , \cenv , \ckaddr) \\
-    \cstore' &\triangleq \cstore \sqcup [\ckaddr' \mapsto \ckont]
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  %%%%% COLUMN BREAK %%%%%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  \vfill\null
-  \columnbreak
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  %%%%% COLUMN BREAK %%%%%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-    $ A\langle \cstate \rangle \leadsto \cstate $
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-    \text{where }
-    \cstore(\ckaddr) &= \textbf{mt}
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%% CALLK DONE %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-    $\A{v}{\cenv}{\cstore}{\ckaddr}$
-    $\leadsto \E{e_b}{\cenv'}{\cstore'}{\ckaddr'}$
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-    \text{where }
-    \cstore(\ckaddr) &= \textbf{callk}(call, done ,
-                       \epsilon , \cenv_{\ckont} , \ckaddr') \\
-    done &= ((\lambda \; (x \; ...) \; e_b) , \cenv_{\lambda}) :: v' \\
-    v'' &\triangleq v' \mdoubleplus v \\
-    \cenv' &\triangleq \cnewenv(call , \cenv) \\
-    a_{x_{i}} &\triangleq (x_i , \cenv') \\
-    x_{j}' &\triangleq free((\lambda \; (x \; ...) \; e_b)) \\
-    a_{x_{j}'} &\triangleq (x'_j , \cenv') \\
-    \cstore' &\triangleq \cstore \sqcup [a_{x_i} \mapsto v_i'']
-               \sqcup [a_{x_{j}'} \mapsto \cstore(x_{j}' , \cenv_{\lambda})] \\
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%%% CALLK TODO %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-    $\A{v}{\cenv}{\cstore}{\ckaddr}$
-    $\leadsto \E{e_h}{\cenv_{\kappa}}{\cstore'}{\ckaddr''}$
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-    \text{where }
-    \cstore(\ckaddr) &= \textbf{callk}(call, done , e_h::e_t ,
-                       \cenv_{\ckont} , \ckaddr') \\
-    \ckaddr'' &\triangleq (e_h , \cenv_{\ckont})\\
-    \ckont &\triangleq \textbf{callk}(call, done \mdoubleplus [v] ,
-                 e_t , \cenv_{\ckont} , \ckaddr') \\
-    \cstore' &\triangleq \cstore \sqcup [\ckaddr'' \mapsto \ckont]
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-  \end{align*}
-  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  \begin{center}
-  \end{center}
-  \vspace{-7mm}
-  \begin{align*}
-  \end{align*}
-\end{multicols*}
-
 \end{document}
