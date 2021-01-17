@@ -43,10 +43,11 @@
 (struct someval (v) #:transparent)
 
 ; primitive functions, implemented by the implementation
-(struct prim (op))
+(struct prim (op) #:transparent)
 (define prims
   (hash '+ (prim +)
         '- (prim -)
+        'list (prim list)
         'cons (prim cons)
         'car (prim car)
         'cdr (prim cdr)
@@ -267,7 +268,13 @@
       (λ (x) x)))
  ; testing simple function call and if expression and numbers
  ; returns 12
- (e ((λ (x) x) (if #f 3 12)))
+ (e '((λ (x) x) (if #f 3 12)))
  ; similar as the last test, but returns a singleton list of 12
- (e ((λ x x) (if #t 12 3)))
+ (e '((λ x x) (if #t 12 3)))
+ ; testing let and set!, should return 42069
+ (e '(let ([x 12]) ((λ (_) x) (set! x 42069))))
+ ; testing that prims work, returns 489
+ (e '(+ 420 69))
+ ; testing applying a prim
+ (e '(apply + (list 420 69)))
  )

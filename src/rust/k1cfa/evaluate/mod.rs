@@ -5,7 +5,8 @@ mod apply;
 mod eval;
 pub mod matching;
 
-use crate::common::{eval_state, kalloc, Env, Expr, Kont, State, Store};
+use crate::Expr;
+use crate::k1cfa::common::{eval_state, kalloc, Env, Kont, State, Store};
 use apply::apply_step;
 use eval::eval_step;
 

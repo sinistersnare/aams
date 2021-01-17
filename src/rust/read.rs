@@ -1,6 +1,8 @@
 //! A Parser of Scheme types.
 //! `Expr` is the AST type here that will be executed.
 
+use std::fmt;
+
 use combine::error::ParseError;
 use combine::parser::char::{char, space};
 use combine::stream::Stream;
@@ -8,7 +10,29 @@ use combine::{
    between, choice, many1, parser, satisfy, sep_by, skip_many, skip_many1, token, Parser,
 };
 
-use crate::common::Expr;
+#[derive(Hash, Clone, PartialEq, Eq)]
+pub enum Expr {
+   List(Vec<Expr>),
+   Atom(String),
+}
+
+impl fmt::Debug for Expr {
+   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      match self {
+         Expr::List(ref list) => {
+            write!(f, "(")?;
+            for (i, e) in list.iter().enumerate() {
+               write!(f, "{:?}", e)?;
+               if i + 1 != list.len() {
+                  write!(f, " ")?;
+               }
+            }
+            write!(f, ")")
+         }
+         Expr::Atom(ref atom) => write!(f, "{}", atom),
+      }
+   }
+}
 
 fn expr_<Input>() -> impl Parser<Input, Output = Expr>
 where

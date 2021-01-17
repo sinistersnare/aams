@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::common::{ConcreteVal, Prim, Val};
+use crate::k1cfa::common::{ConcreteVal, Prim, Val};
 
 fn prim_add(args: &Val) -> Val {
    let mut ret = 0;

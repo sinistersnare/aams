@@ -10,13 +10,17 @@ extern crate im;
 use std::env;
 use std::fs;
 
-mod common;
-mod evaluate;
-mod prims;
+// To use a different machine
+// change the name of the machine module, and the module in the evaluate use.
+// not my best solution but it works well enough!
+
+mod flat_concrete;
 mod read;
 
-use crate::evaluate::evaluate;
 use crate::read::parse_expr;
+use flat_concrete::evaluate;
+
+pub use crate::read::Expr;
 
 fn main() {
    if let Some(filename) = env::args().nth(1) {
@@ -46,10 +50,7 @@ fn exec_str(program: &str) {
    match parsed {
       Ok((sexpr, _)) => {
          let states = evaluate(sexpr);
-         states
-            .iter()
-            .for_each(|(k, v)| println!("{{{:?} --> {:?}}}\n", k, v))
-         // println!("All states: {:#?}", states);
+         println!("All states: {:#?}", states.last());
       }
       Err(e) => println!("Error Parsing: {:?}", e),
    };

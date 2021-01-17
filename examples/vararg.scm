@@ -1,5 +1,5 @@
-(prim +
- ((λ x (let ([a (prim car x)]) (prim * a a)))
+(+
+ ((λ x (let ([a (car x)]) (* a a)))
   3 2 1)
- ((λ x (apply-prim * x)) 1 2 3 4 5))
+ ((λ x (apply * x)) 1 2 3 4 5))
 ; expect 129 as output

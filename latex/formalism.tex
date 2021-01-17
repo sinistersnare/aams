@@ -146,8 +146,8 @@
     \ckaddr \in \cKAddr &\triangleq \mathbb{N} \\
     v \in \cVal &\triangleq \cClo + \mathbb{Z} + \mathbb{B} \\
                         & + \cPrim + \cKont \\
-                        & + \{\textbf{quote}(e) , \textbf{cons}(v , v) ,
-                          \textit{Void}\} \\
+                        & + \{\textbf{quote}(e) , \textbf{cons}(v , v) , \\
+                        & \;\;\;\;\;\; \textit{Void} , \textit{Null} \} \\
     clo \in \cClo &\triangleq \cLam \times \cEnv \\
     \ckont \in \cKont &::= \textbf{mt} \\
                         &|\; \textbf{ifk}(e , e , \cenv , \ckaddr) \\
@@ -520,7 +520,7 @@
     \cstore(\ckaddr) &= \textbf{callk}(call, done ,
                        \epsilon , \_ , \ckaddr') \\
     done \mdoubleplus [v] &= v_h :: \overrightarrow{v} \\
-    \cstate' &\triangleq CALL(v_h , \overrightarrow{v} \mdoubleplus [v] ,
+    \cstate' &\triangleq CALL(v_h , \overrightarrow{v} ,
                \cenv , \cstore , call , \ckaddr') \\
   \end{align*}
 \end{multicols*}

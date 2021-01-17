@@ -1,4 +1,5 @@
-use crate::common::{CloType, Expr, Prim, Var};
+use crate::Expr;
+use super::common::{CloType, Prim, Var};
 
 /// Expression Matching Code, to see if an Expr
 /// matches some syntax.

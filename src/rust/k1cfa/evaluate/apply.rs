@@ -3,11 +3,14 @@
 //! Apply states are evaluating the current-continuation
 //! because the control is a value.
 
-use crate::common::{
+use crate::Expr;
+
+use crate::k1cfa::common::{
    apply_state, balloc, eval_state, kalloc, make_scm_list, val_maybe_list, ApplyState, CloType,
-   Closure, ConcreteVal, Expr, Kont, State, Val,
+   Closure, ConcreteVal, Kont, State, Val,
 };
-use crate::prims::apply_prim;
+
+use crate::k1cfa::prims::apply_prim;
 
 fn handle_if_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
    let ApplyState { val, store, .. } = st.clone();
@@ -27,7 +30,7 @@ fn handle_if_kont(k: Kont, st: &ApplyState) -> im::HashSet<State> {
       // otherwise, run both.
       if let Ok(ConcreteVal::Boolean(false)) = val.vals {
          // if its false but we have closures too, then we need both branches.
-         if val.closures.is_empty() {
+         if val.closures.is_em1ty() {
             fals
          } else {
             both

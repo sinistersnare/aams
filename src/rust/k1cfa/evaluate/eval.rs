@@ -3,14 +3,14 @@
 //! Those are states that deal with evaluating the control
 //! to reach a value.
 
-use crate::common::{
-   apply_state, eval_state, kalloc, Closure, ConcreteVal, EvalState, Expr, Kont, Prim, State, Val,
-   Var,
+use crate::Expr;
+use crate::k1cfa::common::{
+   apply_state, eval_state, kalloc, Closure, ConcreteVal, EvalState, Kont, Prim, State, Val,
+   Var, matches_boolean, matches_number,
 };
 
-use crate::common::{matches_boolean, matches_number};
-use crate::evaluate::matching::*; // just simple matching functions found in matching.rs
-use crate::prims::apply_prim;
+use crate::k1cfa::evaluate::matching::*; // just simple matching functions found in matching.rs
+use crate::k1cfa::prims::apply_prim;
 
 fn is_atomic(ctrl: &Expr) -> bool {
    match ctrl {
@@ -138,7 +138,6 @@ pub fn eval_step(st: &EvalState) -> State {
       store,
       env,
       kaddr,
-      ..
    } = st.clone();
    if is_atomic(&ctrl) {
       apply_state(atomic_eval(st), store, kaddr)

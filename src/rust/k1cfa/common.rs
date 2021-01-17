@@ -1,4 +1,4 @@
-use std::fmt;
+use crate::Expr;
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum State {
@@ -19,12 +19,6 @@ pub struct ApplyState {
    pub val: Val,
    pub store: Store,
    pub kaddr: KAddr,
-}
-
-#[derive(Hash, Clone, PartialEq, Eq)]
-pub enum Expr {
-   List(Vec<Expr>),
-   Atom(String),
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -279,24 +273,6 @@ impl Val {
                }
             },
          },
-      }
-   }
-}
-
-impl fmt::Debug for Expr {
-   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      match self {
-         Expr::List(ref list) => {
-            write!(f, "(")?;
-            for (i, e) in list.iter().enumerate() {
-               write!(f, "{:?}", e)?;
-               if i + 1 != list.len() {
-                  write!(f, " ")?;
-               }
-            }
-            write!(f, ")")
-         }
-         Expr::Atom(ref atom) => write!(f, "{}", atom),
       }
    }
 }
