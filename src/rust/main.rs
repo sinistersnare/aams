@@ -14,13 +14,13 @@ use std::fs;
 // change the name of the machine module, and the module in the evaluate use.
 // not my best solution but it works well enough!
 
-mod flat_concrete;
+pub mod matching;
+pub mod common;
+mod flat_abstract;
 mod read;
 
 use crate::read::parse_expr;
-use flat_concrete::evaluate;
-
-pub use crate::read::Expr;
+use flat_abstract::evaluate;
 
 fn main() {
    if let Some(filename) = env::args().nth(1) {
@@ -50,7 +50,7 @@ fn exec_str(program: &str) {
    match parsed {
       Ok((sexpr, _)) => {
          let states = evaluate(sexpr);
-         println!("All states: {:#?}", states.last());
+         println!("All states: {:#?}", states);
       }
       Err(e) => println!("Error Parsing: {:?}", e),
    };

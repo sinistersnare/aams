@@ -31,7 +31,7 @@ For Racket, load the machine up in your Racket environment of choice,
 and use the `evaluate` function to run a program.
 
 ```racket
-> (evaluate '(prim + 3 4 (let ([x 6] [y 10]) (prim + x y))))
+> (evaluate '(+ 3 4 (let ([x 6] [y 10]) (+ x y))))
 ```
 
 I haphazardly implemented primitives, the racket version has more than the Rust.
@@ -61,9 +61,6 @@ I want to extend the machines semantics to cover an early pass of
 That way, I can do a static analysis of it, and perform real optimizations
 on it. This is a a stretch goal, but I think it's doable!
 
-* Right now, continuations dont take value stores. Is there some weird behavior that can come about if a value is mutated with `set!` and then when its time to read the continuation, a wrong value is propogated?
-* In rust code, use a `KAddr` type for the KStore? Better typesafety.
-
 ## Bibliography ##
 
 - Abstracting Abstract Machines (AAM)
@@ -82,6 +79,10 @@ on it. This is a a stretch goal, but I think it's doable!
 - - This paper doesnt do AAMs but talks about Abstract Interpretation, CFA, and a few other topics. Also a helpful paper!
 - - M. Might, “Environment analysis of higher-order languages” 2007.
 - - Available online [here](http://matt.might.net/papers/might2007diss.pdf)
+- Resolving and Exploiting the k-CFA Paradox (m-CFA paper)
+- -  This paper introduces the m-CFA analysis, and talks about how you can use flat closures to achieve linear-time CFA for higher-order functional-style (closure based) languages. The machines in this repo use flat-closures nowadays
+- - Matthew Might, Yannis Smaragdakis, and David Van Horn, “Resolving and Exploiting the k-CFA Paradox,” 2010.
+- - Available online [here](http://matt.might.net/papers/might2010mcfa.pdf).
 
 ## License ##
 

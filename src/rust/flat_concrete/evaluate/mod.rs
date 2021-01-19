@@ -3,10 +3,9 @@
 
 mod apply;
 mod eval;
-mod matching;
 
-use crate::flat_concrete::common::{Env, KAddr, Kont, State, Store};
-use crate::Expr;
+use crate::flat_concrete::domains::{Env, KAddr, Kont, State, Store};
+use crate::common::{Expr};
 use apply::apply_step;
 use eval::eval_step;
 

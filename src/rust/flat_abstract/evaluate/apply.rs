@@ -1,9 +1,11 @@
 //! Handles apply states, which applies a value relative to the current continuation.
 
 use crate::common::{Expr, LambdaArgType, Var};
-use crate::flat_concrete::domains::{ApplyState, BAddr, Closure, Env, KAddr, Kont, State, Store, Val};
 use crate::matching::{Matching, match_syntax};
-use crate::flat_concrete::prims::{apply_prim, PRIMS};
+use crate::flat_abstract::domains::{
+   ApplyState, BAddr, Closure, Env, KAddr, Kont, State, Store, Val,
+};
+use crate::flat_abstract::prims::{apply_prim, PRIMS};
 
 fn find_frees(expr: Expr, bound: im::HashSet<Var>) -> im::Vector<Var> {
    match match_syntax(expr) {
@@ -250,7 +252,7 @@ fn handle_call(st: &ApplyState, kont: Kont) -> State {
    }
 }
 
-pub fn apply_step(st: &ApplyState) -> State {
+pub fn apply_step(st: &ApplyState) -> im::HashSet<State> {
    let ApplyState { store, kaddr, .. } = st.clone();
    let kont = store.getk(&kaddr);
    match kont {

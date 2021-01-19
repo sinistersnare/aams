@@ -1,11 +1,61 @@
-use crate::flat_concrete::common::{LambdaArgType, Var};
-use crate::Expr;
+//! Expression Matching Code, to see if an Expr
+//! matches some syntax.
 
-/// Expression Matching Code, to see if an Expr
-/// matches some syntax.
+use crate::common::{Expr, LambdaArgType, Var};
+
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+pub enum Matching {
+   Quote(Expr),
+   Apply(Expr, Expr),
+   Lambda(LambdaArgType, Expr),
+   If(Expr, Expr, Expr),
+   Let(Vec<Var>, Vec<Expr>, Expr),
+   Call(Vec<Expr>),
+   Callcc(Expr),
+   SetBang(Var, Expr),
+   Number(i64),
+   Boolean(bool),
+   StrAtom(String)
+}
+
+// None if there was no specific matching
+// (so an untagged call should be used.)
+pub fn match_syntax(expr: Expr) -> Matching {
+   match expr {
+      Expr::List(list) => {
+         if let Some((ec, et, ef)) = matches_if_expr(&list) {
+            Matching::If(ec, et, ef)
+         } else if let Some((vars, exprs, eb)) = matches_let_expr(&list) {
+            Matching::Let(vars, exprs, eb)
+         } else if let Some((var, expr)) = matches_setbang_expr(&list) {
+            Matching::SetBang(var, expr)
+         } else if let Some(expr) = matches_callcc_expr(&list) {
+            Matching::Callcc(expr)
+         } else if let Some((ef, ea)) = matches_apply_expr(&list) {
+            Matching::Apply(ef, ea)
+         } else if let Some((argtype, body)) = matches_lambda_expr(&list) {
+            Matching::Lambda(argtype, body)
+         } else if let Some(e) = matches_quote_expr(&list) {
+            Matching::Quote(e)
+         } else {
+            Matching::Call(list)
+         }
+      }
+      Expr::Atom(atom) => {
+         if let Some(n) = matches_number(&atom) {
+            Matching::Number(n)
+         } else if let Some(b) = matches_boolean(&atom) {
+            Matching::Boolean(b)
+         } else {
+            Matching::StrAtom(atom)
+         }
+      }
+   }
+}
+
 
 /// (quote e)
-pub fn matches_quote_expr(list: &[Expr]) -> Option<Expr> {
+fn matches_quote_expr(list: &[Expr]) -> Option<Expr> {
    if list.len() == 2 && list[0] == Expr::Atom("quote".to_string()) {
       Some(list[1].clone())
    } else {
@@ -14,7 +64,7 @@ pub fn matches_quote_expr(list: &[Expr]) -> Option<Expr> {
 }
 
 /// (apply e e)
-pub fn matches_apply_expr(list: &[Expr]) -> Option<(Expr, Expr)> {
+fn matches_apply_expr(list: &[Expr]) -> Option<(Expr, Expr)> {
    if list.len() == 3 && list[0] == Expr::Atom("apply".to_string()) {
       Some((list[1].clone(), list[2].clone()))
    } else {
@@ -24,7 +74,7 @@ pub fn matches_apply_expr(list: &[Expr]) -> Option<(Expr, Expr)> {
 
 /// (lambda (x ...) e)
 /// (lambda x e)
-pub fn matches_lambda_expr(list: &[Expr]) -> Option<(LambdaArgType, Expr)> {
+fn matches_lambda_expr(list: &[Expr]) -> Option<(LambdaArgType, Expr)> {
    if list.len() == 3
       && (list[0] == Expr::Atom("lambda".to_string()) || list[0] == Expr::Atom("λ".to_string()))
    {
@@ -51,7 +101,7 @@ pub fn matches_lambda_expr(list: &[Expr]) -> Option<(LambdaArgType, Expr)> {
 }
 
 /// (if e e e)
-pub fn matches_if_expr(list: &[Expr]) -> Option<(Expr, Expr, Expr)> {
+fn matches_if_expr(list: &[Expr]) -> Option<(Expr, Expr, Expr)> {
    if list.len() == 4 && list[0] == Expr::Atom("if".to_string()) {
       Some((list[1].clone(), list[2].clone(), list[3].clone()))
    } else {
@@ -60,7 +110,7 @@ pub fn matches_if_expr(list: &[Expr]) -> Option<(Expr, Expr, Expr)> {
 }
 
 /// (let ([x e] ...) e)
-pub fn matches_let_expr(list: &[Expr]) -> Option<(Vec<Var>, Vec<Expr>, Expr)> {
+fn matches_let_expr(list: &[Expr]) -> Option<(Vec<Var>, Vec<Expr>, Expr)> {
    if list.len() == 3 && list[0] == Expr::Atom("let".to_string()) {
       match list[1] {
          Expr::List(ref outer) => {
@@ -99,7 +149,7 @@ pub fn matches_let_expr(list: &[Expr]) -> Option<(Vec<Var>, Vec<Expr>, Expr)> {
 }
 
 /// (call/cc e)
-pub fn matches_callcc_expr(list: &[Expr]) -> Option<Expr> {
+fn matches_callcc_expr(list: &[Expr]) -> Option<Expr> {
    if list.len() == 2 && list[0] == Expr::Atom("call/cc".to_string()) {
       Some(list[1].clone())
    } else {
@@ -108,7 +158,7 @@ pub fn matches_callcc_expr(list: &[Expr]) -> Option<Expr> {
 }
 
 /// (set! x e)
-pub fn matches_setbang_expr(list: &[Expr]) -> Option<(Var, Expr)> {
+fn matches_setbang_expr(list: &[Expr]) -> Option<(Var, Expr)> {
    if list.len() == 3 && list[0] == Expr::Atom("set!".to_string()) {
       match list[1] {
          Expr::Atom(ref x) => Some((Var(x.clone()), list[2].clone())),
@@ -121,11 +171,11 @@ pub fn matches_setbang_expr(list: &[Expr]) -> Option<(Var, Expr)> {
    }
 }
 
-pub fn matches_number(str: &str) -> Option<i64> {
+fn matches_number(str: &str) -> Option<i64> {
    str.parse::<i64>().ok()
 }
 
-pub fn matches_boolean(str: &str) -> Option<bool> {
+fn matches_boolean(str: &str) -> Option<bool> {
    // because we cant parse #t/#f rn, just use true/false.
    if str == "#t" {
       Some(true)

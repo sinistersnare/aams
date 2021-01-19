@@ -1,6 +1,6 @@
-use crate::Expr;
+//! Machine dependent domains.
 
-//#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+use crate::common::{Expr, LambdaArgType, Prim, Var};
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum State {
@@ -40,6 +40,9 @@ pub struct BAddr(pub Var, pub Env);
 pub struct KAddr(pub usize);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
+pub struct Closure(pub LambdaArgType, pub Expr, pub Env);
+
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum Val {
    Null,
    Void,
@@ -53,15 +56,6 @@ pub enum Val {
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Closure(pub LambdaArgType, pub Expr, pub Env);
-
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub enum LambdaArgType {
-   FixedArg(Vec<Var>),
-   VarArg(Var),
-}
-
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum Kont {
    Empty,
    If(Expr, Expr, Env, KAddr),
@@ -72,12 +66,6 @@ pub enum Kont {
    Call(Expr, Vec<Val>, Vec<Expr>, Env, KAddr),
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Var(pub String);
-
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub struct Prim(pub String);
-
 impl State {
    pub fn eval(ctrl: Expr, env: Env, store: Store, kaddr: KAddr) -> Self {
       State::E(EvalState {
@@ -87,6 +75,7 @@ impl State {
          kaddr,
       })
    }
+
    pub fn apply(val: Val, env: Env, store: Store, kaddr: KAddr) -> Self {
       State::A(ApplyState {
          val,
