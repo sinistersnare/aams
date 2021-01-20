@@ -4,12 +4,10 @@
 mod apply;
 mod eval;
 
-use crate::flat_abstract::domains::{Env, KAddr, Kont, State, Store};
 use crate::common::Expr;
+use crate::flat_abstract::domains::{Env, KAddr, Kont, State, Store};
 use apply::apply_step;
 use eval::eval_step;
-
-use std::iter::FromIterator;
 
 fn inject(ctrl: Expr) -> State {
    let env0 = Env::new();
@@ -45,7 +43,7 @@ pub fn evaluate(ctrl: Expr) -> im::HashMap<State, im::HashSet<State>> {
       let combined_stores = combine_stores(results);
       // add to CFG
       cfg = cfg.update(doing, combined_stores.clone());
-      todo = im::Vector::from_iter(combined_stores.into_iter()) + todo;
+      todo = combined_stores.into_iter().collect::<im::Vector<_>>() + todo;
    }
    cfg
 }
@@ -66,4 +64,3 @@ fn combine_stores(states: im::HashSet<State>) -> im::HashSet<State> {
       .map(|o| o.set_store(global.clone()))
       .collect()
 }
-

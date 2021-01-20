@@ -1,68 +1,8 @@
 //! Handles apply states, which applies a value relative to the current continuation.
 
-use crate::common::{Expr, LambdaArgType, Var};
+use crate::common::{Expr, LambdaArgType, Var, find_frees};
 use crate::flat_concrete::domains::{ApplyState, BAddr, Closure, Env, KAddr, Kont, State, Store, Val};
-use crate::matching::{Matching, match_syntax};
 use crate::flat_concrete::prims::{apply_prim, PRIMS};
-
-fn find_frees(expr: Expr, bound: im::HashSet<Var>) -> im::Vector<Var> {
-   match match_syntax(expr) {
-      Matching::If(ec, et, ef) => {
-         let ec_free = find_frees(ec, bound.clone());
-         let et_free = find_frees(et, bound.clone());
-         let ef_free = find_frees(ef, bound);
-         ec_free + et_free + ef_free
-      }
-      Matching::Let(vars, exprs, eb) => {
-         let bindings_free: im::Vector<Var> = exprs
-            .into_iter()
-            .map(|expr| find_frees(expr, bound.clone()))
-            .flatten()
-            .collect();
-         bindings_free + find_frees(eb, bound + vars.into_iter().collect())
-      }
-      Matching::SetBang(var, expr) => {
-         let var_free = if bound.contains(&var) {
-            im::Vector::new()
-         } else {
-            im::Vector::unit(var)
-         };
-         var_free + find_frees(expr, bound)
-      }
-      Matching::Callcc(expr) => {
-         find_frees(expr, bound)
-      }
-      Matching::Apply(ef, ea) => {
-         find_frees(ef, bound.clone()) + find_frees(ea, bound)
-      }
-      Matching::Call(args) => {
-         args
-            .into_iter()
-            .map(|expr| find_frees(expr, bound.clone()))
-            .flatten()
-            .collect()
-      }
-      Matching::Lambda(argtype, body) => {
-         match argtype {
-            LambdaArgType::FixedArg(args) => {
-               find_frees(body, bound + args.into_iter().collect())
-            }
-            LambdaArgType::VarArg(arg) => find_frees(body, bound.update(arg)),
-         }
-      }
-      Matching::StrAtom(a) => {
-         let var = Var(a.clone());
-         if PRIMS.contains_key(&*a) || bound.contains(&var) {
-            im::Vector::new()
-         } else {
-            im::Vector::unit(var)
-         }
-      }
-      Matching::Quote(..) | Matching::Number(..) | Matching::Boolean(..) => {
-         im::Vector::new()
-      }
-   }
-}
 
 fn make_scm_list(vals: Vec<Val>) -> Val {
    let mut lst = Val::Null;
@@ -108,7 +48,9 @@ fn call_helper(
             .clone()
             .into_iter()
             .map(|var| BAddr(var, next_env.clone()));
-         let free_vars = find_frees(body.clone(), args.into_iter().collect());
+         let bound_prims = PRIMS.keys().map(|p| Var(p.to_string())).collect();
+         let free_vars = find_frees(body.clone(),
+            bound_prims + args.into_iter().collect());
          let free_addrs = free_vars
             .clone()
             .into_iter()
@@ -127,8 +69,9 @@ fn call_helper(
       Val::Closure(Closure(LambdaArgType::VarArg(arg), body, lamenv)) => {
          let arg_vals = make_scm_list(arg_vals);
          let next_env = env.next(ctx);
+         let bound_prims = PRIMS.keys().map(|p| Var(p.to_string())).collect();
          let arg_addr = BAddr(arg.clone(), next_env.clone());
-         let free_vars = find_frees(body.clone(), im::HashSet::unit(arg));
+         let free_vars = find_frees(body.clone(), bound_prims + im::HashSet::unit(arg));
          let free_addrs = free_vars
             .clone()
             .into_iter()

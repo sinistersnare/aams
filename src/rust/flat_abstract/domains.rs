@@ -1,6 +1,6 @@
 //! Machine specific domains
 
-use crate::common::{Expr, LambdaArgType, Var, Prim};
+use crate::common::{Expr, LambdaArgType, Prim, Var};
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum State {
@@ -41,17 +41,17 @@ pub struct KAddr(pub Expr, pub Env);
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Val {
-   inner_val: Result<InnerVal, bool>,
-   closures: im::HashSet<Closure>,
+   pub inner_val: Result<InnerVal, bool>,
+   pub primitives: im::HashSet<Prim>,
+   pub kontinuations: im::HashSet<Kont>,
+   pub closures: im::HashSet<Closure>,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum InnerVal {
    Null,
    Void,
-   Prim(Prim),
    Number(i64),
-   Kont(Kont),
    Boolean(bool),
    Quote(Expr),
    Cons(Box<Val>, Box<Val>),
@@ -92,10 +92,12 @@ impl State {
 
    pub fn set_store(self, store: Store) -> Self {
       match self {
-         State::E(EvalState { ctrl, env, kaddr, .. }) =>
-            State::eval(ctrl, env, store, kaddr),
-         State::A(ApplyState { val, env, kaddr, .. }) =>
-            State::apply(val, env, store, kaddr),
+         State::E(EvalState {
+            ctrl, env, kaddr, ..
+         }) => State::eval(ctrl, env, store, kaddr),
+         State::A(ApplyState {
+            val, env, kaddr, ..
+         }) => State::apply(val, env, store, kaddr),
       }
    }
 }
@@ -123,7 +125,9 @@ impl Store {
 
    pub fn join(&self, baddr: BAddr, val: Val) -> Self {
       Store {
-         bindings: self.bindings.update(baddr, val),
+         bindings: self
+            .bindings
+            .update(baddr.clone(), Val::from_old(self.bindings.get(&baddr), val)),
          kontinuations: self.kontinuations.clone(),
       }
    }
@@ -174,27 +178,56 @@ impl Store {
 }
 
 impl Val {
-   pub fn from(iv: InnerVal) -> Self {
+   /// creates an empty value,
+   /// should only be used interally to form a correct Val.
+   fn new() -> Self {
       Val {
-         inner_val: Ok(iv),
+         inner_val: Err(false),
+         primitives: im::HashSet::new(),
+         kontinuations: im::HashSet::new(),
          closures: im::HashSet::new(),
       }
    }
 
-   pub fn from_clo(c: Closure) -> Self {
-      Val {
-         inner_val: Err(false),
-         closures: im::HashSet::unit(c),
-      }
+   pub fn from(iv: InnerVal) -> Self {
+      let mut v = Val::new();
+      v.inner_val = Ok(iv);
+      v
    }
 
-   pub fn from_old(old: Option<&Self> , new: Self) -> Self {
+   pub fn from_prim(p: Prim) -> Self {
+      let mut v = Val::new();
+      v.primitives = im::HashSet::unit(p);
+      v
+   }
+
+   pub fn from_kont(k: Kont) -> Self {
+      let mut v = Val::new();
+      v.kontinuations = im::HashSet::unit(k);
+      v
+   }
+
+   pub fn from_clo(c: Closure) -> Self {
+      let mut v = Val::new();
+      v.closures = im::HashSet::unit(c);
+      v
+   }
+
+   pub fn top() -> Self {
+      let mut v = Val::new();
+      v.inner_val = Err(true);
+      v
+   }
+
+   pub fn from_old(old: Option<&Self>, new: Self) -> Self {
       match old {
          None => new,
          Some(old) => Val {
+            kontinuations: old.kontinuations.clone().union(new.kontinuations),
+            primitives: old.primitives.clone().union(new.primitives),
             closures: old.closures.clone().union(new.closures),
-            inner_val: match (old.inner_val , new.inner_val) {
-               (Err(true), _) | (_ , Err(true)) => Err(true),
+            inner_val: match (old.inner_val.clone(), new.inner_val) {
+               (Err(true), _) | (_, Err(true)) => Err(true),
                (Err(false), other) | (other, Err(false)) => other,
                (Ok(v1), Ok(v2)) => {
                   if v1 == v2 {
@@ -203,15 +236,45 @@ impl Val {
                      Err(true)
                   }
                }
-            }
-         }
+            },
+         },
       }
    }
 
-   pub fn top() -> Self {
-      Val {
-         inner_val: Err(true),
-         closures: im::HashSet::new(),
+   pub fn is_truthy(&self) -> bool {
+      match self.inner_val {
+         Err(false) => true,
+         Ok(ref iv) => iv != &InnerVal::Boolean(false),
+         _ => false,
+      }
+   }
+
+   pub fn is_falsy(&self) -> bool {
+      self == &Val::from(InnerVal::Boolean(false))
+   }
+
+   // returns the number if this value is only ever a number.
+   pub fn is_number(&self) -> Option<i64> {
+      if self.primitives.is_empty() && self.kontinuations.is_empty() && self.closures.is_empty() {
+         if let Ok(InnerVal::Number(n)) = self.inner_val {
+            Some(n)
+         } else {
+            None
+         }
+      } else {
+         None
+      }
+   }
+
+   pub fn is_cons(&self) -> Option<(Box<Val>, Box<Val>)> {
+      if self.primitives.is_empty() && self.kontinuations.is_empty() && self.closures.is_empty() {
+         if let Ok(InnerVal::Cons(car, cdr)) = self.inner_val.clone() {
+            Some((car, cdr))
+         } else {
+            None
+         }
+      } else {
+         None
       }
    }
 }

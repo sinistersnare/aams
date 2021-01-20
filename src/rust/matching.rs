@@ -15,7 +15,7 @@ pub enum Matching {
    SetBang(Var, Expr),
    Number(i64),
    Boolean(bool),
-   StrAtom(String)
+   StrAtom(String),
 }
 
 // None if there was no specific matching
@@ -52,7 +52,6 @@ pub fn match_syntax(expr: Expr) -> Matching {
       }
    }
 }
-
 
 /// (quote e)
 fn matches_quote_expr(list: &[Expr]) -> Option<Expr> {

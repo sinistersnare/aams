@@ -13,7 +13,6 @@
 //! I also use the continuation-allocator from Pushdown For Free by Gilray et al.
 //! This allows perfect stack precision for our continuation allocation.
 
-
 mod domains;
 mod evaluate;
 mod prims;

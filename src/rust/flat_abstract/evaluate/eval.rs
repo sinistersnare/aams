@@ -5,35 +5,22 @@
 //! * Use new abstract-KAddr allocation scheme
 
 use crate::common::{Expr, Prim, Var};
-use crate::matching::{Matching, match_syntax};
 use crate::flat_abstract::domains::{BAddr, Closure, EvalState, InnerVal, KAddr, Kont, State, Val};
 use crate::flat_abstract::prims::PRIMS;
+use crate::matching::{match_syntax, Matching};
 
-pub fn atomic_eval(
-   matching: Matching,
-   EvalState {
-      ctrl, env, store, ..
-   }: &EvalState,
-) -> Val {
+pub fn atomic_eval(matching: Matching, EvalState { env, store, .. }: &EvalState) -> Val {
    match matching {
-      Matching::Quote(e) => {
-         Val::from(InnerVal::Quote(e))
-      }
-      Matching::Number(n) => {
-         Val::from(InnerVal::Number(n))
-      }
-      Matching::Boolean(b) => {
-         Val::from(InnerVal::Boolean(b))
-      }
-      Matching::Lambda(argtype, body) => {
-         Val::from_clo(Closure(argtype, body, env.clone()))
-      }
+      Matching::Quote(e) => Val::from(InnerVal::Quote(e)),
+      Matching::Number(n) => Val::from(InnerVal::Number(n)),
+      Matching::Boolean(b) => Val::from(InnerVal::Boolean(b)),
+      Matching::Lambda(argtype, body) => Val::from_clo(Closure(argtype, body, env.clone())),
       Matching::StrAtom(atom) => {
          let addr = BAddr(Var(atom.clone()), env.clone());
          if store.contains_binding(&addr) {
             store.get(&addr)
          } else if PRIMS.contains_key(&*atom) {
-            Val::from(InnerVal::Prim(Prim(atom.clone())))
+            Val::from_prim(Prim(atom))
          } else {
             panic!("unbound identifier: `{:?}`", atom);
          }
@@ -51,14 +38,14 @@ pub fn eval_step(st: &EvalState) -> State {
       store,
       kaddr,
    } = st.clone();
-   match match_syntax(ctrl) {
+   match match_syntax(ctrl.clone()) {
       Matching::If(ec, et, ef) => {
          let next_kaddr = KAddr(ec.clone(), env.clone());
          let kont = Kont::If(et, ef, env.clone(), kaddr);
          let next_store = store.joink(next_kaddr.clone(), kont);
          State::eval(ec, env, next_store, next_kaddr)
       }
-      Matching::Let(vars, exprs, eb) => {
+      Matching::Let(vars, mut exprs, eb) => {
          // God forgive me for I have sinned
          let lamexpr = Expr::List(vec![
             Expr::Atom("lambda".to_string()),
@@ -91,7 +78,7 @@ pub fn eval_step(st: &EvalState) -> State {
          let func = args.remove(0);
          let next_kaddr = KAddr(func.clone(), env.clone());
          let kont = Kont::Call(
-            ctrl.clone(),
+            ctrl,
             Vec::with_capacity(args.len() + 1),
             args,
             env.clone(),

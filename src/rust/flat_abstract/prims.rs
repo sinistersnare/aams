@@ -4,23 +4,57 @@ use crate::common::Prim;
 use crate::flat_abstract::domains::{InnerVal, Val};
 
 fn prim_add(args: &[Val]) -> Val {
-   Val::from(InnerVal::Number(69))
+   let mut ret = 0;
+   for v in args {
+      if let Some(n) = v.is_number() {
+         ret += n;
+      } else {
+         return Val::top();
+      }
+   }
+   Val::from(InnerVal::Number(ret))
 }
 
 fn prim_mult(args: &[Val]) -> Val {
-   Val::from(InnerVal::Number(69))
+   let mut ret = 1;
+   for v in args {
+      if let Some(n) = v.is_number() {
+         ret *= n;
+      } else {
+         return Val::top();
+      }
+   }
+   Val::from(InnerVal::Number(ret))
 }
 
 fn prim_cons(args: &[Val]) -> Val {
-   Val::from(InnerVal::Number(69))
+   if args.len() != 2 {
+      panic!("cons Error. Expected 2 args, given {:?}", args);
+   }
+   let (car, cdr) = (args[0].clone(), args[1].clone());
+   Val::from(InnerVal::Cons(Box::new(car), Box::new(cdr)))
 }
 
 fn prim_car(args: &[Val]) -> Val {
-   Val::from(InnerVal::Number(69))
+   if args.len() != 1 {
+      panic!("car Error. Expected 1 arg, given {:?}", args);
+   }
+   if let Some((car, _cdr)) = args[0].is_cons() {
+      *car
+   } else {
+      Val::top()
+   }
 }
 
 fn prim_cdr(args: &[Val]) -> Val {
-   Val::from(InnerVal::Number(69))
+   if args.len() != 1 {
+      panic!("car Error. Expected 1 arg, given {:?}", args);
+   }
+   if let Some((_car, cdr)) = args[0].is_cons() {
+      *cdr
+   } else {
+      Val::top()
+   }
 }
 
 fn prim_null(_: &[Val]) -> Val {

@@ -14,9 +14,9 @@ use std::fs;
 // change the name of the machine module, and the module in the evaluate use.
 // not my best solution but it works well enough!
 
-pub mod matching;
 pub mod common;
 mod flat_abstract;
+pub mod matching;
 mod read;
 
 use crate::read::parse_expr;
