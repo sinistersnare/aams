@@ -1,0 +1,67 @@
+; 2-CFA of a small 2-arg lambda-calculus.
+; input program
+;  ((λ (x y) (x x y))  (λ (x y) (y x y))  (λ (x y) (x y x)))
+
+(prog 0)
+(app 0 1 8 15)
+(lam 1 2 3 4)
+(app 4 5 6 7)
+(var 5 2)
+(var 6 2)
+(var 7 3)
+(lam 8 9 10 11)
+(app 11 12 13 14)
+(var 12 10)
+(var 13 9)
+(var 14 10)
+(lam 15 16 17 18)
+(app 18 19 20 21)
+(var 19 16)
+(var 20 17)
+(var 21 16)
+
+; outputs following relations:
+; (aeval e-id t0 t1 evald-id)
+
+; we can always reach the top-level of the program.
+[(prog x) --> (reachesCfg x x x)]
+; 2 CFA!
+[(prog x) --> (ctx x x)]
+
+; handle function application
+[(app id id-f id-a0 id-a1) ; there is some application
+ (aeval id-f t0 t1 clo-lam-id clo-t0 clo-t1) ; id-f evaluates to some thing clo-lam-id
+ (aeval id-a0 t0 t1 a0-lam-id a0-t0 a0-t1) ; arg 0 evalautes to some thing a0-lam-id
+ (aeval id-a1 t0 t1 a1-lam-id a1-t0 a1-t1) ; arg 1 evaluates to some thing a1-lam-id
+ (lam clo-lam-id x y id-body) ; the clo-lam-id is a lam
+ (reachesCfg id t0 t1) ; this application is reachable
+ -->
+ (store x id t0 a0-lam-id a0-t0 a0-t1)
+ (store y id t0 a1-lam-id a1-t0 a1-t1)
+ (step id t0 t1 id-body id t0 clo-lam-id clo-t0 clo-t1)
+ (reachesCfg id-body id t0)
+ (reachesClo clo-lam-id clo-t0 clo-t1)
+ (ctx id t0)]
+
+; handle evaluation of lambdas
+[(lam id x y id-body)
+ (ctx t0 t1)
+ -->
+ (aeval id t0 t1 id t0 t1)]
+
+; handle local parameter evaluation x at t.
+[(var ref-id x)
+ (reachesClo clo-lam-id clo-t0 clo-t1)
+ (store x t0 t1 clo-lam-id clo-t0 clo-t1)
+ -->
+ (aeval ref-id t0 t1 clo-lam-id clo-t0 clo-t1)]
+
+; otherwise, propogate free variables
+[(step id-call _ _ id-body t0 t1 tclo-lam-id tclo-t0 tclo-t1)
+ (lam tclo-lam-id p0 p1 tclo-lam-body)
+ (var id-ref x)
+ (aeval id-ref lam-t0 lam-t1 clo-lam-id clo-t0 clo-t1)
+ (=/= p0 x)
+ (=/= p1 x)
+ -->
+ (aeval id-ref t0 t1 clo-lam-id clo-t0 clo-t1)]
