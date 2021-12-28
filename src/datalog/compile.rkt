@@ -4,41 +4,59 @@
 
 ; supported relations:
 (struct prog (id) #:transparent)
-(struct lam (id x-id y-id body-id) #:transparent)
-(struct var (id which-id) #:transparent)
-(struct app (id arg0-id arg1-id arg2-id) #:transparent)
+(struct lam (id formals body-id) #:transparent) ; a multi-arg lambda
+(struct var (id formals-id formal-pos) #:transparent) ; a variable reference
+(struct app (id args-id) #:transparent) ; a function application
 
-(define (compile-lambda code n env)
-  (match-define `(λ (,x ,y) ,e) code)
-  (define lam-id n)
-  (define x-id (+ n 1))
-  (define y-id (+ n 2))
-  (define next-id (+ n 3))
-  (match-define (cons rest-rels done-n) (do-compile e next-id (hash-set (hash-set env x x-id) y y-id)))
-  (cons (cons (lam lam-id x-id y-id next-id) rest-rels)
-        done-n))
+(struct formal-param (id lam-id arg-pos) #:transparent) ; the parameter of a lambda
+(struct app-arg (id app-pos arg-id) #:transparent) ; an argument in a lambda (could be the one in fn position)
+
+; compiles a multi-argument lambda into relations.
+; will output a list of 1 lambda relation, a relation for each formal parameter
+; and the relations produced by the body.
+(define (compile-lambda code cur-id env)
+  (match-define `(λ (,formals ...) ,ebody) code)
+  (define lam-id cur-id)
+  (define formals-id (+ cur-id 1))
+  (define next-id (+ cur-id 2))
+  (define formal-params (map (λ (i) (formal-param formals-id lam-id i)) (range (length formals))))
+  (define body-env (foldl (λ (fp-id argname res-env) (hash-set res-env argname fp-id))
+                          env
+                          (map (λ (fp) (match-define (formal-param fp-id _ pos) fp) (cons fp-id pos)) formal-params)
+                          formals))
+  (match-define (cons body-rels done-id) (do-compile ebody next-id body-env))
+  (cons `(,(lam lam-id formals-id next-id) ,@formal-params ,@body-rels)
+        done-id))
 
 (define (compile-var code n env)
-  (cons (list (var n (hash-ref env code)))
+  (match-define (cons fp-id pos) (hash-ref env code))
+  (cons (list (var n fp-id pos))
         (+ n 1)))
 
-(define (compile-app code n env)
+; compiles an untagged application, something like (f a b c)
+; Returns a list containing an app relation,
+; and an app-arg relation for each argument (including the function part)
+(define (compile-untagged-application code cur-id env)
   (match-define `(,es ...) code)
-  (define app-id n)
-  (match-define (list arg-rels next-n arg-ids)
+  (define app-id cur-id)
+  (define args-id (+ cur-id 1))
+  (match-define (list compiled-rels done-n _num-args)
     (foldl (λ (arg res)
-             (match-define (list mid-rels mid-n mid-ids) res)
-             (match-define (cons arg-rels next-n) (do-compile arg mid-n env))
-             (list (append mid-rels arg-rels) next-n (append mid-ids (list mid-n))))
-           (list '() (+ n 1) '()) es))
-  (cons (cons (apply app (cons app-id arg-ids)) arg-rels)
-        next-n))
+             (match-define (list mid-rels mid-id cur-pos) res)
+             (match-define (cons arg-rels next-n) (do-compile arg mid-id env))
+             `((,@mid-rels ,(app-arg args-id cur-pos mid-id) ,@arg-rels)
+               ,next-n ,(+ cur-pos 1)))
+           (list (list (app app-id args-id))
+                 (+ cur-id 2)
+                 0)
+           es))
+  (cons compiled-rels done-n))
 
 ; returns a list of relations given scheme
 (define (do-compile code n env)
   (match code
     [`(λ ,_ ,_) (compile-lambda code n env)]
-    [`(,_ ...) (compile-app code n env)]
+    [`(,_ ...) (compile-untagged-application code n env)]
     [(? symbol?) (compile-var code n env)]))
 
 (define (compile code)

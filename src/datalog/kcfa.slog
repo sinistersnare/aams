@@ -1,7 +1,8 @@
 ; 2-CFA of a small 2-arg lambda-calculus.
+;
 ; input program
 ;  ((λ (x y) (x x y))  (λ (x y) (y x y))  (λ (x y) (x y x)))
-
+; shown as relations:
 (prog 0)
 (app 0 1 8 15)
 (lam 1 2 3 4)
