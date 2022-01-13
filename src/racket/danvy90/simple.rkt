@@ -8,17 +8,27 @@
 ; The machine isnt a classic AM, so its not big or small, but im gonna try to shoe-horn it in anyways.
 ; if anything it would be a big step....? Cause it evaluates in terms of evaluation.
 
-(struct E (ctrl env kont meta) #:transparent)
-(struct A (val kont meta) #:transparent)
-(struct condκ (et ef ρ κ) #:transparent)
+; these structs are the values used in the env
+; usually if you only have escape continuations, you can just put
+; the continuation into the env, but with delim, you need to know
+; which type it is.
 (struct escapeκ (κ) #:transparent)
 (struct delimκ (κ) #:transparent)
-(struct delimγ (κ γ) #:transparent)
+
+; state types
+(struct E (ctrl env kont meta) #:transparent)
+(struct A (val kont meta) #:transparent)
+
+; continuation types
+(struct condκ (et ef ρ κ) #:transparent)
 (struct shiftκ () #:transparent)
 (struct resetκ () #:transparent)
-(struct resetγ (κ γ) #:transparent)
 (struct fnκ (done todo ρ κ) #:transparent)
 (struct argκ (v κ) #:transparent)
+
+; metacontinuation types, kind of the same, they dont have diff semantics.
+(struct delimγ (κ γ) #:transparent)
+(struct resetγ (κ γ) #:transparent)
 
 (struct primv (p) #:transparent)
 
@@ -108,5 +118,5 @@
      (run-print-range (step s) (- nstart 1) (- nend 1))]))
 
 
-'((lambda (flip fail choice triple) (<> (displayln (triple 10 15))))
+#;'((lambda (flip fail choice triple) (<> (displayln (triple 10 15))))
   (lambda () (ξ c (begin (c #t) (c #f) (fail)))))
