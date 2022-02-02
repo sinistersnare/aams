@@ -10,21 +10,55 @@
 ; It does not use redex-semantics directly, but it is inspired by the
 ; paper nonetheless.
 
+;; I used this document for try/catch impl: https://gist.github.com/sebfisch/2235780
+
+
+; a mutable cell, needs the current value for Get and the continuation for Set.
+(struct mutcellv (v κ) #:transparent)
 ; a delimited continuation prompt.
 (struct promptv (p) #:transparent)
+; a closure value, lambda × environment
+(struct clov (λ ρ) #:transparent)
 ; a primitive function
 (struct primv (p) #:transparent)
 (define prims (hash 'add1 (primv (λ (n) (add1 n)))
                     'displayln (primv (λ (v) (displayln v)))
-                    '+ (primv +)))
+                    '+ (primv +)
+                    'makeCell (primv (λ (v κ) (mutcellv v κ)))
+                    'GetState (primv (λ (cell)
+                                       (match cell
+                                         [(mutcellv v _) v]
+                                         [_ (raise 'not-a-cell!)])))
+                    'GetStateκ (primv (λ (cell)
+                                        (match cell
+                                          [(mutcellv _ κ) κ]
+                                          [_ (raise 'not-a-cell!)])))))
 
 (define (prim? x) (member x (hash-keys prims)))
 
+; literals that are atomic and can be atomically evaluated.
 (define (atomic? x) (match x
-                      [(or `(λ ,_ ,_) (? boolean?) (? number?)
-                           (? prim?) (? promptv?) (? symbol?)) #t]
+                      [(or `(λ ,_ ,_) (? boolean?) (? number?) (? string?) (? symbol?)) #t]
                       [_ #f]))
 
+;; TODO:
+;; impl mutation
+;; impl amb, or backtracking search
+;;
+;; hypothesis: Copying and reinstating happens a lot of times...
+;; could it be done smarter?
+;; if we know its gonna be done, could we use assignment instead
+;; of complex stack maneuvers?
+
+;; maybe if we have a `reset`/`pushPrompt` and we know there is a `shift`/`withSubCont` coming,
+;; we dont execute any of the inner bits? Because theyre just gonna be aborted later... Maybe we
+;; evaluate it then? And then if the continuation is never reinstated we would have saved some work!
+;; like (+ 1 (reset (+ 2 3 (shift k (if (rand) (k 4) 4)))))
+;; Depending on (rand), this could return 5 or 10. Whats the point of pre-computing (+ 2 3 [])
+;; if we may not actually reinstantiate it
+;;
+;; I think this should be done only if we know that reset will be called,
+;; but are just unsure if the cont will be reinstated.
 
 ; state types
 ;; The 'meta'-continuation is the full continuation here,
@@ -36,10 +70,11 @@
 
 (define (atomic-eval v ρ)
   (match v
-    [`(λ ,_ ,_) `(clo ,v ,ρ)]
+    [`(λ ,_ ,_) (clov v ρ)]
     [(? prim?) (hash-ref prims v)]
-    [(? symbol?) (hash-ref ρ v)]
-    ; numbers, prompts, etc. just get passed unchanged.
+    [(? symbol?) (hash-ref ρ v (λ () (pretty-display `(cant find ,v in ,ρ))
+                                  (raise 'no-symbol!)))]
+    ; numbers, strings, prompts, etc. just get passed unchanged.
     [_ v]))
 
 (struct mtκ () #:transparent)
@@ -50,13 +85,53 @@
 
 (define (step-E st)
   (match-define (E ctrl ρ κ γ) st)
+  #;(pretty-display `(ctrl: ,ctrl atomic? ,(atomic? ctrl)))
   (match ctrl
     [(? atomic? v) (A (atomic-eval v ρ) κ γ)]
     [`(if ,ec ,et ,ef) (E ec ρ (ifκ et ef ρ κ) γ)]
+    ; eval is the initial value of the state
+    ; ebody is a lambda that takes an argument which is the variable that holds the state.
+    ; inside of the ebody, (GetState ,var) and (SetState ,var ,newVal) can be used to get/set.
+    ; GetState is impld as a primitive function! nice!
+    [`(WithState ,initval ,ebody)
+     (define promptname (gensym 'p))
+     (define kname (gensym 'κ))
+     (E `(,ebody
+          ((λ (,promptname)
+             (pushPrompt ,promptname
+                         (withSubCont ,promptname (λ (,kname) (makeCell ,initval ,kname)))))
+           (newPrompt)))
+        ρ κ γ)]
+    [`(SetState ,cell ,newval)
+     (define cellval (gensym 'cellκ))
+     (E `((λ (,cellval)
+            (pushSubCont ,cellval (makeCell ,newval ,cellval)))
+          (GetStateκ ,cell))
+        ρ κ γ)]
     ; just use gensym instead of keeping the next number around in the state.
     ; do the symbol->string->symbol dance so it gets interned and we can use eq?
     [`(newPrompt) (A (promptv (string->symbol (symbol->string
                                                (gensym 'prompt)))) κ γ)]
+
+    ; throw and try are syntax transformers.
+    ; they just reinterpret the code into more code.
+    ;; TODO: make a %%CUR-EXC-PROMPT at the top level so top-level throw works.
+    [`(throw ,e)
+     (define handlervar (gensym 'handler))
+     (E `(withSubCont %%CUR-EXC-PROMPT
+                      (λ (%%_k) (λ (,handlervar) (,handlervar ,e))))
+        ρ κ γ)]
+    [`(try ,etry ,ecatch)
+     ; if etry throws then the binding never materializes because control is
+     ; thrown to the handler. If it does not throw, then the inner 1-unused-arg
+     ; lambda *is* returned, so the handler (unused arg)
+     ; is disregarded inside of it.
+     (E `(((λ (%%CUR-EXC-PROMPT)
+             (pushPrompt %%CUR-EXC-PROMPT ((λ (%%temp) (λ (_h) %%temp))
+                                           ,etry)))
+           (newPrompt))
+          ,ecatch)
+        ρ κ γ)]
     ; right now, the second arg to pushPrompt is just a body
     ; to be executed in a non-standard way.
     ; This requires a special continuation frame.
@@ -68,6 +143,8 @@
     ; reinstates the delim continuation eseq with value ev in the hole.
     ; could be simplified to just let eseq be represented as a function.
     ; TODO: I feel like this can be impld as a special case of fnκ...
+    ;       That is, get rid of pushSubCont and just do (κ val) call syntax
+    ;       like call/cc.
     ;       But there may be some evaluation-order trickery im not thinking of?
     ;       unlikely because if we just impl sequences as functions then
     ;       eval-order would be regular... hmm...
@@ -101,29 +178,58 @@
        ['withSubContκ
         ; here, v is a closure taking 1 argument
         ; we call the function giving it the delimited seq.
-        (match-define `(,p (clo (λ (,k) ,ebody) ,ρ)) args)
+        (match-define `(,p ,(clov `(λ (,k) ,ebody) ρ)) args)
         ; TODO: should the cons be before or after the delimit?
         ;       I feel like if prompts are not repeated it
         ;       should not matter semantically.
         (define before-γseq (γseq-before (γseq-cons κ γ) p))
         (define after-γseq (γseq-after γ p))
         (E ebody (hash-set ρ k before-γseq) (mtκ) after-γseq)]
-       [`(clo (λ ,xs ,e) ,ρ)
+       [(clov `(λ ,xs ,e) ρ)
+        (when (not (= (length xs) (length args)))
+          (pretty-display `(incorrect-number-of-args!
+                            expected: ,(length xs)
+                            given: ,(length args)
+                            for function (λ ,xs ,e)))
+          (raise 'badargs))
         (E e (foldr (λ (x v h) (hash-set h x v)) ρ xs args) κ γ)]
-       [(primv pf) (A (apply pf args) κ γ)])]
+       [(primv pf) (A (apply pf args) κ γ)]
+       [_ (pretty-display f) (raise 'unknown-f)])]
     [(fnκ done (cons next rest) ρ κ)
      (E next ρ (fnκ (append done (list v)) rest ρ κ) γ)]))
+
+(define reifys
+  (hash 'reify (clov `(λ (k) (λ (v) (pushSubCont k v))) (hash))
+        'reifyP (clov `(λ (p k) (λ (v) (pushPrompt p (pushSubCont k v)))) (hash))))
+(define starting-env
+  (hash
+   'reify (hash-ref reifys 'reify)
+   'reifyP (hash-ref reifys 'reifyP)
+   '-F- (clov `(λ (p f) (withSubCont p (λ (k) (f (reify k))))) reifys)
+   '-F+ (clov `(λ (p f) (withSubCont p (λ (k) (f (reifyP p k))))) reifys)
+   '+F- (clov `(λ (p f) (withSubCont p (λ (k) (pushPrompt p (f (reify k)))))) reifys)
+   '+F+ (clov `(λ (p f) (withSubCont p (λ (k) (pushPrompt p (f (reifyP p k)))))) reifys)))
+
+; wraps a program in infrastructure, allowing call/cc to be used.
+(define (wrap e)
+  `((λ (p0)
+      (pushPrompt
+       p0
+       ((λ (withCont)
+          ((λ (reifyA)
+             ((λ (call/cc) ,e)
+              (λ (f) (withCont (λ (k) (pushSubCont k (f (reifyA k))))))))
+           (λ (k) (λ (v) (withCont (λ (_) (pushSubCont k v)))))))
+        (λ (e) (withSubCont p0 (λ (k) (pushPrompt p0 (e k))))))))
+    (newPrompt)))
 
 (define (step s)
   (match s
     [(? E?) (step-E s)]
     [(? A?) (step-A s)]
-    [_ (error "wat")]))
+    [_ (raise "wat")]))
 
-; TODO: add a top-level prompt to the program so we can have call/cc?
-; TODO: add top-level F-family functions for different usage?
-;       -F- is withSubCont, I want -+, +-, and ++ (shift) too!
-(define (inject e) (E e (hash) (mtκ) (γseq-empty)))
+(define (inject e) (E e starting-env (mtκ) (γseq-empty)))
 
 (define (run e0)
   (define injected (inject e0))
@@ -134,6 +240,23 @@
       [(A _ (mtκ) (? γseq-empty?)) next]
       [_ (loop next)]))
   (loop injected))
+
+(define (run-steps e0)
+  (define s0 (inject e0))
+  (define (loop s)
+    (define got (string-trim (read-string 2)))
+    (cond
+      [(eq? got "p")
+       (pretty-display s)
+       (loop s)]
+      [(eq? got "q")
+       s]
+      [else
+       (define next (step s))
+       (match next
+         [(A _ (mtκ) (? γseq-empty?)) next]
+         [_ (loop next)])]))
+  (loop s0))
 
 (define (γseq? γ)
   (match γ
@@ -176,3 +299,27 @@
 
 
 ;(cons 'a (reset (cons 'b (shift f (cons 1 (f (f (cons 'c '()))))))))
+
+#;
+(require racket/control)
+#;
+(let ([pout (new-prompt)]
+      [pin (new-prompt)])
+  (+ 1 (reset-at pout
+                 (+ 1 2 (shift-at pout k 4))))
+  #;
+  (+ 1 (reset-at
+        pout
+        (shift-at
+         pout kout
+         (+ 1 2
+            (reset-at pin (shift-at pin kin (kout 3))))))))
+
+
+;; simple examples of straight DC
+#;
+(run '((λ (p) (pushPrompt p (withSubCont p (λ (k) (+ 1 (pushSubCont k 5)))))) (newPrompt)))
+#;
+(run '((λ (p) (pushPrompt p (+ 1 (withSubCont p (λ (k) (+ 2 1)))))) (newPrompt)))
+;; TODO: add examples of try/catch
+;; TODO: add examples of mutation
