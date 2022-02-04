@@ -14,7 +14,7 @@
 
 
 ; a mutable cell, needs the current value for Get and the continuation for Set.
-(struct mutcellv (v κ) #:transparent)
+(struct mutcellv (v p) #:transparent)
 ; a delimited continuation prompt.
 (struct promptv (p) #:transparent)
 ; a closure value, lambda × environment
@@ -24,15 +24,9 @@
 (define prims (hash 'add1 (primv (λ (n) (add1 n)))
                     'displayln (primv (λ (v) (displayln v)))
                     '+ (primv +)
-                    'makeCell (primv (λ (v κ) (mutcellv v κ)))
-                    'GetState (primv (λ (cell)
-                                       (match cell
-                                         [(mutcellv v _) v]
-                                         [_ (raise 'not-a-cell!)])))
-                    'GetStateκ (primv (λ (cell)
-                                        (match cell
-                                          [(mutcellv _ κ) κ]
-                                          [_ (raise 'not-a-cell!)])))))
+                    'makeCell (primv mutcellv)
+                    'GetState (primv mutcellv-v)
+                    'GetStatePrompt (primv mutcellv-p)))
 
 (define (prim? x) (member x (hash-keys prims)))
 
@@ -83,6 +77,22 @@
 (struct pushSubContκ (ebody ρ κ) #:transparent)
 (struct fnκ (done todo ρ κ) #:transparent)
 
+; _should_ return the number 8... Not a cell or anything else.
+#; ; doesnt work because the prompt is lost after the argument is evaluated.
+   ; so we need to wrap the whole call/state with a pushPrompt...
+'((λ (cell)
+    ((λ (_) (+ 1 (GetState cell)))
+     ((λ (cellprompt) (withSubCont cellprompt (λ (_) (makeCell 7 cellprompt))))
+      (%%GetStatePrompt cell))))
+  ((λ (prompt)
+     (pushPrompt prompt
+                 (makeCell 5 prompt)))
+   (newPrompt)))
+#;
+'((λ (cell) ((λ (_) (+ 1 (GetState cell)))
+             (SetCell cell 7)))
+  (makeCell 5))
+
 (define (step-E st)
   (match-define (E ctrl ρ κ γ) st)
   #;(pretty-display `(ctrl: ,ctrl atomic? ,(atomic? ctrl)))
@@ -93,20 +103,27 @@
     ; ebody is a lambda that takes an argument which is the variable that holds the state.
     ; inside of the ebody, (GetState ,var) and (SetState ,var ,newVal) can be used to get/set.
     ; GetState is impld as a primitive function! nice!
-    [`(WithState ,initval ,ebody)
+    [`(call/state ,initval ,ebody)
      (define promptname (gensym 'p))
      (define kname (gensym 'κ))
+     (E `((λ (,promptname)
+            (pushPrompt
+             ,promptname
+             (,ebody (makeCell ,initval ,promptname))))
+          (newPrompt))
+        ρ κ γ)
+     #;
      (E `(,ebody
           ((λ (,promptname)
              (pushPrompt ,promptname
-                         (withSubCont ,promptname (λ (,kname) (makeCell ,initval ,kname)))))
+                         (makeCell ,initval ,promptname)))
            (newPrompt)))
         ρ κ γ)]
     [`(SetState ,cell ,newval)
-     (define cellval (gensym 'cellκ))
-     (E `((λ (,cellval)
-            (pushSubCont ,cellval (makeCell ,newval ,cellval)))
-          (GetStateκ ,cell))
+     (define cellpromptname (gensym 'cellκ))
+     (E `((λ (,cellpromptname)
+            (withSubCont ,cellpromptname (λ (_) (makeCell ,newval ,cellpromptname))))
+          (%%GetStatePrompt ,cell))
         ρ κ γ)]
     ; just use gensym instead of keeping the next number around in the state.
     ; do the symbol->string->symbol dance so it gets interned and we can use eq?
@@ -115,7 +132,7 @@
 
     ; throw and try are syntax transformers.
     ; they just reinterpret the code into more code.
-    ;; TODO: make a %%CUR-EXC-PROMPT at the top level so top-level throw works.
+    ;; TODO: make a %%CUR-EXC-PROMPT at the top level so top-level throw works...?
     [`(throw ,e)
      (define handlervar (gensym 'handler))
      (E `(withSubCont %%CUR-EXC-PROMPT
@@ -149,6 +166,10 @@
     ;       unlikely because if we just impl sequences as functions then
     ;       eval-order would be regular... hmm...
     [`(pushSubCont ,eseq ,ebody) (E eseq ρ (pushSubContκ ebody ρ κ) γ)]
+    ; impl let as a simple shorthand for function calling.
+    ; just for convenience.
+    [`(let ([,xs ,es] ...) ,ebody)
+     (E `((λ ,xs ,ebody) . ,es) ρ κ γ)]
     [`(,ef ,es ...) (E ef ρ (fnκ '() es ρ κ) γ)]))
 
 (define (step-A st)
