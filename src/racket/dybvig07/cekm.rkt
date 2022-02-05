@@ -19,14 +19,18 @@
 (struct promptv (p) #:transparent)
 ; a closure value, lambda × environment
 (struct clov (λ ρ) #:transparent)
+; an effect handler, the op is a closure object,
+; is a primitive object so we can handle it specially at a call-site
+; we need to change the continuation when a handler is called.
+(struct handlerv (op prompt) #:transparent)
 ; a primitive function
 (struct primv (p) #:transparent)
-(define prims (hash 'add1 (primv (λ (n) (add1 n)))
-                    'displayln (primv (λ (v) (displayln v)))
+(define prims (hash 'displayln (primv (λ (v) (displayln v)))
+                    'add1 (primv add1)
                     '+ (primv +)
-                    'makeCell (primv mutcellv)
-                    'GetState (primv mutcellv-v)
-                    'GetStatePrompt (primv mutcellv-p)))
+                    'MakeHandler (primv handlerv)
+                    'HandlerOp (primv handlerv-op)
+                    'HandlerPrompt (primv handlerv-prompt)))
 
 (define (prim? x) (member x (hash-keys prims)))
 
@@ -57,8 +61,7 @@
 ; state types
 ;; The 'meta'-continuation is the full continuation here,
 ;; called the 'sequence' in Dybvig 07.
-;; The 'Continuation' itself is a simply the 'delimited context'
-;; as shown in the paper.
+;; The 'Continuation' itself is a simply the 'delimited context' from the paper.
 (struct E (ctrl env kont meta) #:transparent)
 (struct A (val kont meta) #:transparent)
 
@@ -77,80 +80,23 @@
 (struct pushSubContκ (ebody ρ κ) #:transparent)
 (struct fnκ (done todo ρ κ) #:transparent)
 
-; _should_ return the number 8... Not a cell or anything else.
-#; ; doesnt work because the prompt is lost after the argument is evaluated.
-   ; so we need to wrap the whole call/state with a pushPrompt...
-'((λ (cell)
-    ((λ (_) (+ 1 (GetState cell)))
-     ((λ (cellprompt) (withSubCont cellprompt (λ (_) (makeCell 7 cellprompt))))
-      (%%GetStatePrompt cell))))
-  ((λ (prompt)
-     (pushPrompt prompt
-                 (makeCell 5 prompt)))
-   (newPrompt)))
 #;
-'((λ (cell) ((λ (_) (+ 1 (GetState cell)))
-             (SetCell cell 7)))
-  (makeCell 5))
+(match '(withHandler ([throw (λ (x k) x)] [get (λ (x k) (k 1))])
+                     (+ 1000 (perform throw (+ 1 (perform get 3)))))
+  ['(withHandler ([,ops ,hs] ...) ,ebody) 'good]
+  [else 'bad])
 
 (define (step-E st)
   (match-define (E ctrl ρ κ γ) st)
   #;(pretty-display `(ctrl: ,ctrl atomic? ,(atomic? ctrl)))
   (match ctrl
     [(? atomic? v) (A (atomic-eval v ρ) κ γ)]
-    [`(if ,ec ,et ,ef) (E ec ρ (ifκ et ef ρ κ) γ)]
-    ; eval is the initial value of the state
-    ; ebody is a lambda that takes an argument which is the variable that holds the state.
-    ; inside of the ebody, (GetState ,var) and (SetState ,var ,newVal) can be used to get/set.
-    ; GetState is impld as a primitive function! nice!
-    [`(call/state ,initval ,ebody)
-     (define promptname (gensym 'p))
-     (define kname (gensym 'κ))
-     (E `((λ (,promptname)
-            (pushPrompt
-             ,promptname
-             (,ebody (makeCell ,initval ,promptname))))
-          (newPrompt))
-        ρ κ γ)
-     #;
-     (E `(,ebody
-          ((λ (,promptname)
-             (pushPrompt ,promptname
-                         (makeCell ,initval ,promptname)))
-           (newPrompt)))
-        ρ κ γ)]
-    [`(SetState ,cell ,newval)
-     (define cellpromptname (gensym 'cellκ))
-     (E `((λ (,cellpromptname)
-            (withSubCont ,cellpromptname (λ (_) (makeCell ,newval ,cellpromptname))))
-          (%%GetStatePrompt ,cell))
-        ρ κ γ)]
     ; just use gensym instead of keeping the next number around in the state.
     ; do the symbol->string->symbol dance so it gets interned and we can use eq?
     [`(newPrompt) (A (promptv (string->symbol (symbol->string
                                                (gensym 'prompt)))) κ γ)]
-
-    ; throw and try are syntax transformers.
-    ; they just reinterpret the code into more code.
-    ;; TODO: make a %%CUR-EXC-PROMPT at the top level so top-level throw works...?
-    [`(throw ,e)
-     (define handlervar (gensym 'handler))
-     (E `(withSubCont %%CUR-EXC-PROMPT
-                      (λ (%%_k) (λ (,handlervar) (,handlervar ,e))))
-        ρ κ γ)]
-    [`(try ,etry ,ecatch)
-     ; if etry throws then the binding never materializes because control is
-     ; thrown to the handler. If it does not throw, then the inner 1-unused-arg
-     ; lambda *is* returned, so the handler (unused arg)
-     ; is disregarded inside of it.
-     (E `(((λ (%%CUR-EXC-PROMPT)
-             (pushPrompt %%CUR-EXC-PROMPT ((λ (%%temp) (λ (_h) %%temp))
-                                           ,etry)))
-           (newPrompt))
-          ,ecatch)
-        ρ κ γ)]
     ; right now, the second arg to pushPrompt is just a body
-    ; to be executed in a non-standard way.
+    ; to be executed in a non-standard evaluation order.
     ; This requires a special continuation frame.
     ; if we wanted to simply eval, we could require this to be a thunk,
     ; and worry about special work in the function call logic.
@@ -159,13 +105,33 @@
     [`(withSubCont ,ep ,ef) (E ep ρ (fnκ '(withSubContκ) (list ef) ρ κ) γ)]
     ; reinstates the delim continuation eseq with value ev in the hole.
     ; could be simplified to just let eseq be represented as a function.
-    ; TODO: I feel like this can be impld as a special case of fnκ...
-    ;       That is, get rid of pushSubCont and just do (κ val) call syntax
-    ;       like call/cc.
-    ;       But there may be some evaluation-order trickery im not thinking of?
-    ;       unlikely because if we just impl sequences as functions then
-    ;       eval-order would be regular... hmm...
     [`(pushSubCont ,eseq ,ebody) (E eseq ρ (pushSubContκ ebody ρ κ) γ)]
+    ; sets up handlers and then executes the body, much like a let statement works.
+    #;(withHandler ([throw (λ (x k) x)] [get (x k) (k 1)])
+                   (+ 1000 (perform throw (+ 1 (perform get '())))))
+    ; should return 2, as the []+1000 is escaped from before its returned.
+    [`(withHandler ([,ops ,hs] ...) ,ebody)
+     (define promptname (gensym 'p))
+     (E `((λ (,promptname)
+            (pushPrompt
+             ,promptname
+             (let ,(map (λ (op h) `(,op (MakeHandler ,h ,promptname))) ops hs)
+               ,ebody)))
+          (newPrompt))
+        ρ κ γ)]
+    [`(perform ,operation ,arg)
+     (define kname (gensym 'k))
+     (define opname (gensym 'op))
+     (define argname (gensym 'arg))
+     (E `(let ([,opname ,operation])
+           (withSubCont
+            (HandlerPrompt ,opname)
+            (λ (,kname)
+              ((HandlerOp ,opname) ,arg
+                                   (λ (,argname)
+                                     (pushSubCont ,kname ,argname))))))
+        ρ κ γ)]
+    [`(if ,ec ,et ,ef) (E ec ρ (ifκ et ef ρ κ) γ)]
     ; impl let as a simple shorthand for function calling.
     ; just for convenience.
     [`(let ([,xs ,es] ...) ,ebody)
@@ -215,7 +181,7 @@
           (raise 'badargs))
         (E e (foldr (λ (x v h) (hash-set h x v)) ρ xs args) κ γ)]
        [(primv pf) (A (apply pf args) κ γ)]
-       [_ (pretty-display f) (raise 'unknown-f)])]
+       [_ (pretty-display `(not-given-a-function ,f)) (raise 'unknown-f)])]
     [(fnκ done (cons next rest) ρ κ)
      (E next ρ (fnκ (append done (list v)) rest ρ κ) γ)]))
 
