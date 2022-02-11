@@ -1,4 +1,7 @@
 #lang racket
+
+(provide run)
+
 (require racket/struct)
 ; A CEK machine similar to that shown in figure 1 of
 ; Dybvig et al. 2007 "A Monadic Framework for Delimited Continuations"
@@ -17,6 +20,7 @@
 ; the prompt is used to find which handler to get to
 ; and the handlers object is a hash to search for the handler.
 (struct handlerv (prompt handlers) #:transparent)
+(struct handleropv (i) #:transparent)
 ; a delimited continuation prompt.
 (struct promptv (p) #:transparent)
 ; a closure value, lambda × environment
@@ -33,9 +37,11 @@
                     'add1 (primv add1)
                     '+ (primv +)
                     'MakeHandler (primv (λ (prompt . handlers)
-                                          (handlerv prompt (apply hash handlers))))
+                                          (handlerv prompt (apply vector handlers))))
                     'HandlerPrompt (primv handlerv-prompt)
-                    'HandlerGet (primv (λ (h r) (hash-ref (handlerv-handlers h) r)))))
+                    'HandlerGet (primv (λ (h i) (vector-ref (handlerv-handlers h)
+                                                            (handleropv-i i))))
+                    'MakeOp (primv handleropv)))
 
 (define (prim? x) (member x (hash-keys prims)))
 
@@ -83,6 +89,7 @@
 
 (struct ifκ (et ef ρ κ) #:transparent)
 (struct pushPromptκ (ebody ρ κ) #:transparent)
+(struct withSubContκ (ep ef ρ κ) #:transparent)
 (struct pushSubContκ (ebody ρ κ) #:transparent)
 (struct fnκ (done todo ρ κ) #:transparent)
 
@@ -108,7 +115,7 @@
     ; and worry about special work in the function call logic.
     [`(pushPrompt ,ep ,ebody) (E ep ρ (pushPromptκ ebody ρ κ) γ)]
     ; takes a 1-arg function as second argument, that arg is the cont obj.
-    [`(withSubCont ,ep ,ef) (E ep ρ (fnκ '(withSubContκ) (list ef) ρ κ) γ)]
+    [`(withSubCont ,ep ,ef) (E ep ρ (withSubContκ '∅ ef ρ κ) γ)]
     ; reinstates the delim continuation eseq with value ev in the hole.
     ; could be simplified to just let eseq be represented as a function.
     [`(pushSubCont ,eseq ,ebody) (E eseq ρ (pushSubContκ ebody ρ κ) γ)]
@@ -116,38 +123,41 @@
     ; for use when performing operations.
     ; used like
     #; (call/handler ([throw (λ (_ x) x)] [get (λ (k) (k 4))])
-                     (λ (m) (+ 1 (perform m throw (perform m get)))))
+                     (λ (m) (+ 1 (perform throw m (perform get m)))))
+    #; (withHandler (...) (+ 1 (perform throw (perform get))))
     [`(call/handler ([,ops ,fs] ...) ,elam)
-     ; have to explicitly quote the op name, so its not treated like a variable.
-     (define handlers (map list (map (λ (q) `(quote ,q)) ops) fs))
      (define promptname (gensym 'p))
-     (E `(let ([,promptname (newPrompt)])
-           (pushPrompt
-            ,promptname
-            (,elam (MakeHandler ,promptname . ,(append* handlers)))))
+     (define opbinds (map (λ (op i) `[,op (MakeOp ,i)]) ops (range (length ops))))
+     (E `(let ([,promptname (newPrompt)] . ,opbinds)
+           (pushPrompt ,promptname (,elam (MakeHandler ,promptname . ,fs))))
         ρ κ γ)]
     ; TODO: It seems Biernacki et al 2019,
     ;                Brachthauser and Schuster 2017, and
     ;                Zhang and Myers 2019 all cover
     ;       'lexical effect handlers using delimited control'. Look at those?
     ;       See the last bullet point before Fig1 in 'Effect Handlers, Evidently'
-    [`(perform ,op ,ev ,args ...)
+    [`(perform ,eop ,eh ,args ...)
+     ; handlers have +F+ semantics, so we can nest `perform` calls and we can
+     ; reinstantiate handlers outside of their original context.
      (define kname (gensym 'k))
      (define opname (gensym 'op))
-     (define evname (gensym 'ev))
+     (define hname (gensym 'h))
      (define kargname (gensym 'karg))
-     ; have to explicitly quote the op name, so its not treated like a variable.
-     (E `(let ([,opname (quote ,op)] [,evname ,ev])
-           (withSubCont
-            (HandlerPrompt ,evname)
-            (λ (,kname)
-              ((HandlerGet ,evname ,opname)
-               (λ (,kargname) (pushSubCont ,kname ,kargname))
-               . ,args))))
+     (define promptvar (gensym 'promptvar))
+     (E `(let ([,opname ,eop] [,hname ,eh])
+           (let ([,promptvar (HandlerPrompt ,hname)])
+             (withSubCont
+              ,promptvar
+              (λ (,kname)
+                (pushPrompt
+                 ,promptvar
+                 ((HandlerGet ,hname ,opname)
+                  (λ (,kargname) (pushPrompt
+                                  ,promptvar
+                                  (pushSubCont ,kname ,kargname))) . ,args))))))
         ρ κ γ)]
     [`(if ,ec ,et ,ef) (E ec ρ (ifκ et ef ρ κ) γ)]
-    ; impl let as a simple shorthand for function calling.
-    ; just for convenience.
+    ; impl let as a simple shorthand for function calling... for convenience!
     [`(let ([,xs ,es] ...) ,ebody)
      (E `((λ ,xs ,ebody) . ,es) ρ κ γ)]
     [`(,ef ,es ...) (E ef ρ (fnκ '() es ρ κ) γ)]))
@@ -167,7 +177,18 @@
      (A v newκ newγ)]
     ; delimits the current context. v is a prompt.
     [(pushPromptκ ebody ρ κ)
+     #;(pretty-display `(placing-prompt ,v))
      (E ebody ρ 'κε (γseq-cons v (γseq-cons κ γ)))]
+    [(withSubContκ '∅ ef ρ κ)
+     (E ef ρ (withSubContκ v '∅ ρ κ) γ)]
+    [(withSubContκ p '∅ ρ κ)
+     ; here, v is a closure taking 1 argument
+     ; we call the function giving it the delimited seq.
+     (match-define (clov `(λ (,k) ,ebody) ρ) v)
+     #;(pretty-display `(splitting ,p ,γ))
+     (define before-γseq (γseq-cons κ (γseq-before γ p)))
+     (define after-γseq (γseq-after γ p))
+     (E ebody (hash-set ρ k before-γseq) 'κε after-γseq)]
     ; Here, v is a sequence, and we use it to reinstate the continuation.
     [(pushSubContκ ebody ρ κ)
      (E ebody ρ 'κε (γseq-append v (γseq-cons κ γ)))]
@@ -176,16 +197,6 @@
     [(fnκ all-done '() ρ κ)
      (match-define (cons f args) (append all-done (list v)))
      (match f
-       ['withSubContκ
-        ; here, v is a closure taking 1 argument
-        ; we call the function giving it the delimited seq.
-        (match-define `(,p ,(clov `(λ (,k) ,ebody) ρ)) args)
-        ; TODO: should the γseq-cons be before or after the delimit?
-        ;       I feel like if prompts are not repeated it
-        ;       should not matter semantically....?
-        (define before-γseq (γseq-before (γseq-cons κ γ) p))
-        (define after-γseq (γseq-after γ p))
-        (E ebody (hash-set ρ k before-γseq) 'κε after-γseq)]
        [(clov `(λ ,xs ,e) ρ)
         (when (not (= (length xs) (length args)))
           (pretty-display `(incorrect-number-of-args!
@@ -277,86 +288,39 @@
     [`(γκ ,ll . ,lr) `(γκ ,ll . ,(γseq-append lr r))]))
 
 ; the up-arrow delimit operator
-(define (γseq-before γ needle)
+(define/contract (γseq-before γ needle)
+  (-> γseq? promptv? γseq?)
   (match γ
-    ['γε
-     (pretty-display `(needle-not-found! ,needle))
-     γ]
+    ; pretty sure we should raise here, if we are
+    ; looking for a prompt that doesn't exist (anymore possibly).
+    ['γε (raise `(needle-not-found! ,needle))]
     [`(γp ,maybe . ,r) (if (eq? maybe needle)
                            'γε
                            `(γp ,maybe . ,(γseq-before r needle)))]
     [`(γκ ,l . ,r) `(γκ ,l . ,(γseq-before r needle))]))
 
 ; the down-arrow delimit operator
-(define (γseq-after γ needle)
+(define/contract (γseq-after γ needle)
+  (-> γseq? promptv? γseq?)
   (match γ
-    ['γε
-     (pretty-display `(needle-not-found! ,needle))
-     γ]
+    ; pretty sure we should raise here, if we are
+    ; looking for a prompt that doesn't exist (anymore possibly).
+    ['γε (raise `(needle-not-found! ,needle))]
     [`(γp ,maybe . ,r) (if (eq? maybe needle) r (γseq-after r needle))]
     [`(γκ ,l . ,r) (γseq-after r needle)]))
 
 ; when the current delimited context is empty, we need to traverse
 ; the sequence to get the next context (this is underflow behavior).
+; pop all prompts off the stack while looking for the next continuation.
 (define (γseq-get-next γold)
   (match γold
-    [`γε
-     '()]
-    [`(γp ,_ . ,r) (γseq-get-next r)]
+    [`γε '()]
+    [`(γp ,p . ,r) (γseq-get-next r)]
     [`(γκ ,κ . ,γ) (cons κ γ)]))
 
 
-;(cons 'a (reset (cons 'b (shift f (cons 1 (f (f (cons 'c '()))))))))
-
-#;
-(require racket/control)
-#;
-(let ([pout (new-prompt)]
-      [pin (new-prompt)])
-  (+ 1 (reset-at pout
-                 (+ 1 2 (shift-at pout k 4))))
-  #;
-  (+ 1 (reset-at
-        pout
-        (shift-at
-         pout kout
-         (+ 1 2
-            (reset-at pin (shift-at pin kin (kout 3))))))))
-
-
-;; simple examples of straight DC
-#;
-(run '((λ (p) (pushPrompt p (withSubCont p (λ (k) (+ 1 (pushSubCont k 5)))))) (newPrompt)))
-#;
-(run '((λ (p) (pushPrompt p (+ 1 (withSubCont p (λ (k) (+ 2 1)))))) (newPrompt)))
-;; TODO: add examples of try/catch
-;; TODO: add examples of mutation
-
-;; Example of a simple effect handler
-; #; ; returns 2, as the []+1000 is escaped from before its returned.
-#;
-(run '(+ 1 (call/handler ([throw (λ (_ x) x)] [read (λ (k) (k 1))])
-                         (λ (h) (+ 1000 (perform throw h (+ 1 (perform read h))))))))
-
-
-;; Example of local state with an effect handler.
-
-(define got (run '((call/handler ([get (λ (k) (λ (s) ((k s) s)))]
-                      [set (λ (k x) (λ (s) ((k 'void) x)))])
-                     (λ (h) (let ([x (perform get h)])
-                              (let ([_ (perform set h 21)])
-                                (λ (state) (+ x state))))))
-       4)))
-; This is an ugly way to do state, as it passes around a function for state.
-; but its easy enough to implement!
-; this example returns 25, as it gets the initial state, 4, then sets it to 21,
-; then adds them.
-#;
-(withHandler ([get (λ (_ k) (k 0))])
-             (withHandler ([set (λ (x k) (withHandler ([get (λ (_ k) (k x))])
-                                                      (k 'unused)))])
-                          (let ([_ (perform set 42)])
-                            (let ([x (perform get 'unused)])
-                              (let ([_ (perform set 12)])
-                                (let ([y (perform get 'unused)])
-                                  (+ x y)))))))
+; TODO:
+; Small examples to see how an AAM would react
+; Concrete semantics LaTeX
+; start work on AAM in Racket
+; AAM in LaTeX

@@ -76,3 +76,58 @@
 ((λ (p) (pushPrompt p (+ 1
                          (-F+ p (λ (k) (k (-F- p (λ (k2) (k2 5)))))))))
  (newPrompt))
+
+;;; Handler Examples ;;
+
+(require "cekm.rkt")
+
+;; simple examples of straight -F- Delimited Continuation usage.
+#;
+(run '((λ (p) (pushPrompt p (withSubCont p (λ (k) (+ 1 (pushSubCont k 5)))))) (newPrompt)))
+#;
+(run '((λ (p) (pushPrompt p (+ 1 (withSubCont p (λ (k) (+ 2 1)))))) (newPrompt)))
+
+
+; evaluates to 6, as the 10000+[] is escaped from before it can be evaluated.
+(define basic-example
+  '(+ 1 (call/handler ([throw (λ (_ x) x)])
+                      (λ (h) (+ 10000 (perform throw h 5))))))
+
+;; This example shows why handlers need at least +F semantics.
+;; When `withSubCont` is called by the outer throw performance,
+;; the prompt is taken off the stack (as the underlying DC impl is -F-).
+;; So the handler must re-place the prompt so the inner `read`
+;; performance can happen.
+;;
+;; Example of a simple effect handler
+;;
+;; This expr returns 3 as the 9+[] is escaped from before it can be evaluated.
+(define inner-perform-example
+  '(+ 1 (call/handler ([throw (λ (_ x) x)] [read (λ (k) (k 1))])
+                      (λ (h) (+ 9 (perform throw h (+ 1 (perform read h))))))))
+
+;; This example shows why we need at least F+ semantics.
+;; The handlers here escape the context, but also keep around a reference to the
+;; continuation, so it can be executed by the argument (`4` in this case).
+;; However, when the handler is reinstated, the prompt is gone
+;; So we need F+ semantics to re-place the prompt when a continuation is called.
+;;
+;; Example of local state with an effect handler.
+;; get and set abort, only to later reinstate with the state value.
+;;
+;; This example returns 25, as the original state is saved, then changed and
+;; the two values are summed.
+(define leaving-context-example
+  '((call/handler ([get (λ (k) (λ (s) ((k s) s)))]
+                   [set (λ (k x) (λ (s) ((k 'void) x)))])
+                  (λ (h) (let ([x (perform get h)])
+                           (let ([_ (perform set h 21)])
+                             (λ (state) (+ x state))))))
+    4))
+
+#;
+(run basic-example)
+#;
+(run inner-perform-example)
+#;
+(run leaving-context-example)
