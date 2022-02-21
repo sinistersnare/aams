@@ -12,9 +12,14 @@
 ;
 ; It does not use redex-semantics directly, but it is inspired by the
 ; paper nonetheless.
-
-;; I used this document for try/catch impl: https://gist.github.com/sebfisch/2235780
-
+;
+; I originally used this document for try/catch impl:
+; https://gist.github.com/sebfisch/2235780
+; Its good for understanding Delimited Continuations!
+;
+; For the handler implementation, I based it off of
+; 'Effect Handlers, Evidently', by Xie et al. of MSR (ICFP 2020).
+; Handlers use a +F+ semantics, whereas the DCs themselves use -F-.
 
 ; effect handler object, used as evidence when performing effects.
 ; the prompt is used to find which handler to get to
@@ -184,18 +189,17 @@
     [(withSubContκ p '∅ ρ κ)
      ; here, v is a closure taking 1 argument
      ; we call the function giving it the delimited seq.
-     (match-define (clov `(λ (,k) ,ebody) ρ) v)
      #;(pretty-display `(splitting ,p ,γ))
      (define before-γseq (γseq-cons κ (γseq-before γ p)))
      (define after-γseq (γseq-after γ p))
-     (E ebody (hash-set ρ k before-γseq) 'κε after-γseq)]
+     (A before-γseq (fnκ (list v) '() ρ 'κε) after-γseq)]
     ; Here, v is a sequence, and we use it to reinstate the continuation.
     [(pushSubContκ ebody ρ κ)
      (E ebody ρ 'κε (γseq-append v (γseq-cons κ γ)))]
     [(ifκ et ef ρ κ)
      (E (if (false? v) ef et) ρ κ γ)]
-    [(fnκ all-done '() ρ κ)
-     (match-define (cons f args) (append all-done (list v)))
+    [(fnκ all-done '() _ κ)
+     (match-define (cons f args) (reverse (cons v all-done)))
      (match f
        [(clov `(λ ,xs ,e) ρ)
         (when (not (= (length xs) (length args)))
@@ -208,7 +212,7 @@
        [(primv pf) (A (apply pf args) κ γ)]
        [_ (pretty-display `(not-given-a-function ,f)) (raise 'unknown-f)])]
     [(fnκ done (cons next rest) ρ κ)
-     (E next ρ (fnκ (append done (list v)) rest ρ κ) γ)]))
+     (E next ρ (fnκ (cons v done) rest ρ κ) γ)]))
 
 (define reifys
   (hash 'reify (clov `(λ (k) (λ (v) (pushSubCont k v))) (hash))
@@ -287,6 +291,11 @@
     [`(γp ,ll . ,lr) `(γp ,ll . ,(γseq-append lr r))]
     [`(γκ ,ll . ,lr) `(γκ ,ll . ,(γseq-append lr r))]))
 
+
+;; These operations show how we get the -F- semantics.
+;; The prompt is thrown away once its found, so it must be replaced elsewhere to get
+;; +F or F+ semantics.
+;;
 ; the up-arrow delimit operator
 (define/contract (γseq-before γ needle)
   (-> γseq? promptv? γseq?)
